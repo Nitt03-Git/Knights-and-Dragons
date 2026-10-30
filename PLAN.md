@@ -57,16 +57,16 @@ Other games in the genre are a reference for *feel* only.
 |---|---|---|
 | Bowmen Tower | fast single shots, physical | ✅ 0.2 |
 | Knights' Hall | 3 knights at a movable flag on the road, hold and fight | ✅ 0.3 |
-| Wizard Tower | slow, strong magic bolts | 0.4 |
-| Catapult | very slow, splash, physical (half armor) | 0.4 |
+| Wizard Tower | slow, strong magic bolts (ignore armor) | ✅ 0.4 |
+| Catapult | slow, splash, physical (armor counts half), can't hit flyers | ✅ 0.4 |
 
 | Enemy | Role | Status |
 |---|---|---|
 | Kobold Runner | fast, weak, many | ✅ 0.2 |
 | Scaled Brute | armored (bowmen struggle) | ✅ 0.2 |
 | Bridge Troll | slow, lots of health, costs 3 lives | ✅ 0.2 |
-| Hexling | magic-resistant (wizards struggle) | 0.4 |
-| Wyrmling | flying: knights can't hold it, catapults can't hit it | 0.4 |
+| Hexling | magic-resistant (wizards struggle) | ✅ 0.4 |
+| Wyrmling | flying: knights can't hold it, catapults can't hit it | ✅ 0.4 |
 | Dragon | boss | later |
 
 ## Milestones
@@ -85,7 +85,10 @@ Each one is a version the owner can play from the link.
   the first shows the range (and a see-through tower), the second confirms, a tap elsewhere
   cancels. Difficulty stays as it is ("on the hard side", 1 star) until the hero and more
   towers arrive.
-- **0.4**: Wizard Tower and Catapult; Hexling and Wyrmling.
+- **0.4 ✅**: Wizard Tower and Catapult (3 levels each); Hexlings and Wyrmlings join waves 3–6
+  of level 1. Catapult shells aim where the enemy will be when they land. Balance checked
+  with the bot: all four tower types together win with 2 stars, archers alone barely win, so
+  mixing towers pays off (the owner expected more towers to make it a little easier).
 - **0.5**: level select with 3 levels; stars saved on the phone.
 - **0.6**: Level Studio: draw a road with a finger, place build spots, set waves, then
   "Copy level" and paste it into the chat so Claude adds it to `data/levels.json`.

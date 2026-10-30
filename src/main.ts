@@ -8,14 +8,14 @@ import { BALANCE, LEVELS } from './data';
 import { fitView, panView, Renderer, toScreen, toWorld, zoomView, type Overlay, type View } from './render';
 import { Game, STEP } from './sim';
 
-const VERSION = '0.3.1';
+const VERSION = '0.4';
 
-/** Towers in the build ring, clockwise from top-left. Locked ones arrive in later versions. */
+/** Towers in the build ring, clockwise from top-left. */
 const BUILD_RING: { type: string; icon: string; label: string; angle: number; soon?: string }[] = [
   { type: 'archer', icon: '🏹', label: 'Bowmen', angle: -135 },
   { type: 'knights', icon: '🛡️', label: 'Knights', angle: -45 },
-  { type: 'catapult', icon: '🪨', label: 'Catapult', angle: 45, soon: '0.4' },
-  { type: 'wizard', icon: '🔮', label: 'Wizard', angle: 135, soon: '0.4' },
+  { type: 'catapult', icon: '🪨', label: 'Catapult', angle: 45 },
+  { type: 'wizard', icon: '🔮', label: 'Wizard', angle: 135 },
 ];
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;

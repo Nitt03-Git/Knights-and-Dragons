@@ -8,8 +8,9 @@ export { BALANCE, LEVELS } from '../src/data';
 export type BuildPlan = [number, string][];
 
 /**
- * A simple player: whenever it has gold it builds the plan in order (up to `maxTowers`),
- * then upgrades. It never calls waves early. Used to check that levels are winnable but not free.
+ * A simple player: it builds the plan strictly in order (saving up for the next one, up to
+ * `maxTowers`), then upgrades. It never calls waves early. Used to check that levels are
+ * winnable but not free.
  */
 export function playBot(level: Level, plan: BuildPlan, seed = 1, maxTowers = plan.length): Game {
   const g = new Game(level, BALANCE, seed);
@@ -17,7 +18,9 @@ export function playBot(level: Level, plan: BuildPlan, seed = 1, maxTowers = pla
     let built = g.towers.filter(Boolean).length;
     for (const [pad, type] of plan) {
       if (built >= maxTowers) break;
-      if (!g.towers[pad] && g.build(pad, type)) built++;
+      if (g.towers[pad]) continue;
+      if (!g.build(pad, type)) return; // save up for this one
+      built++;
     }
     for (let changed = true; changed; ) {
       changed = false;

@@ -20,8 +20,11 @@ If it still shows an older build, wait a few minutes: GitHub Pages caches the pa
 
 ## How to play
 
-- Tap a grey stone spot to build. **Bowmen** shoot arrows; a **Knights' Hall** sends three
-  knights onto the road to stop enemies. Tap a building to upgrade or sell it.
+- Tap a grey stone spot to build. Tap a building to upgrade or sell it.
+  - **Bowmen**: quick arrows. Weak against armor.
+  - **Knights' Hall**: three knights hold enemies on the road. Can't stop flyers.
+  - **Wizard Tower**: slow, strong magic that ignores armor. Weak against Hexlings.
+  - **Catapult**: slow stones that hit groups. Can't hit flyers.
 - Building, upgrading and selling take two taps: the first shows how far the tower reaches,
   the second (on the ✔) confirms. Tap anywhere else to cancel.
 - To move the knights, drag them (or their flag) to another part of the road. Or tap their

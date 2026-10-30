@@ -1,7 +1,7 @@
 // Draws the game with simple shapes. Phase 2 replaces these draw functions with real art;
 // nothing in here changes the game.
 import { makeRng } from './rng';
-import { WORLD_H, WORLD_W, type Enemy, type Game, type Knight, type Tower } from './sim';
+import { FLY_HEIGHT, WORLD_H, WORLD_W, type Enemy, type Game, type Knight, type Projectile, type Tower } from './sim';
 
 export interface View {
   /** CSS pixels per world unit, and where the world's top-left corner sits on screen. */
@@ -88,6 +88,8 @@ const ENEMY_LOOK: Record<string, { body: string; belly: string }> = {
   kobold: { body: '#c0622d', belly: '#e8a060' },
   brute: { body: '#4f6b8a', belly: '#8aa4bf' },
   troll: { body: '#6b7d4a', belly: '#a3b07a' },
+  hexling: { body: '#6a3d8f', belly: '#b58bd6' },
+  wyrmling: { body: '#3f8f5a', belly: '#a8d98a' },
 };
 
 interface Floater {
@@ -95,6 +97,13 @@ interface Floater {
   color: string;
   x: number;
   y: number;
+  age: number;
+}
+
+interface Boom {
+  x: number;
+  y: number;
+  radius: number;
   age: number;
 }
 
@@ -107,6 +116,7 @@ interface Scenery {
 
 export class Renderer {
   private floaters: Floater[] = [];
+  private booms: Boom[] = [];
   private scenery: Scenery[] = [];
 
   constructor(private ctx: CanvasRenderingContext2D, game: Game) {
@@ -174,7 +184,8 @@ export class Renderer {
         },
       });
     }
-    for (const e of game.enemies) items.push({ y: e.y, draw: () => drawEnemy(ctx, e, game.paths[e.path].length) });
+    // Flyers are drawn after everything that stands on the ground.
+    for (const e of game.enemies) if (!e.spec.flying) items.push({ y: e.y, draw: () => drawEnemy(ctx, e, game.paths[e.path].length) });
     game.towers.forEach((t) => {
       const unit = t && game.towerLevel(t.type, t.level)?.unit;
       if (t && unit) for (const k of t.knights) if (k.state !== 'dead') items.push({ y: k.y, draw: () => drawKnight(ctx, k, unit.hp, game.time) });
@@ -182,21 +193,9 @@ export class Renderer {
     items.sort((a, b) => a.y - b.y);
     for (const it of items) it.draw();
 
-    for (const p of game.projectiles) {
-      const ang = Math.atan2(p.ty - p.y, p.tx - p.x);
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(ang);
-      ctx.strokeStyle = '#3b2a1a';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(-16, 0);
-      ctx.lineTo(4, 0);
-      ctx.stroke();
-      ctx.fillStyle = '#e8e2d0';
-      ctx.fillRect(-18, -3, 5, 6);
-      ctx.restore();
-    }
+    for (const e of game.enemies) if (e.spec.flying) drawEnemy(ctx, e, game.paths[e.path].length);
+    for (const p of game.projectiles) drawProjectile(ctx, p);
+    this.drawBooms(game, dt);
 
     this.drawFloaters(game, dt);
   }
@@ -244,6 +243,27 @@ export class Renderer {
       ctx.lineTo(x + 3, y + 22);
       ctx.fill();
     }
+  }
+
+  private drawBooms(game: Game, dt: number): void {
+    for (const ev of game.events) if (ev.kind === 'boom') this.booms.push({ x: ev.x, y: ev.y, radius: ev.radius, age: 0 });
+    const ctx = this.ctx;
+    for (const b of this.booms) {
+      b.age += dt;
+      const f = Math.min(1, b.age / 0.45);
+      ctx.globalAlpha = 1 - f;
+      ctx.fillStyle = 'rgba(120, 90, 50, 0.45)';
+      ctx.beginPath();
+      ctx.ellipse(b.x, b.y, b.radius * (0.5 + f * 0.6), b.radius * (0.25 + f * 0.3), 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 220, 160, 0.9)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.ellipse(b.x, b.y, b.radius * f, b.radius * f * 0.5, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    this.booms = this.booms.filter((b) => b.age < 0.45);
   }
 
   private drawFloaters(game: Game, dt: number): void {
@@ -356,8 +376,133 @@ function drawPad(ctx: CanvasRenderingContext2D, x: number, y: number, selected: 
   ctx.stroke();
 }
 
+function drawProjectile(ctx: CanvasRenderingContext2D, p: Projectile): void {
+  if (p.kind === 'shell') {
+    // A stone on a high arc, with its shadow on the ground below.
+    const lift = (1 - p.t) * 50 + 4 * 120 * p.t * (1 - p.t);
+    ctx.fillStyle = 'rgba(20, 30, 10, 0.25)';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, 9, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#7d766a';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y - lift, 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#a39b8c';
+    ctx.beginPath();
+    ctx.arc(p.x - 3, p.y - lift - 3, 4, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+  if (p.kind === 'bolt') {
+    const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 16);
+    glow.addColorStop(0, 'rgba(255, 240, 255, 1)');
+    glow.addColorStop(0.35, 'rgba(200, 120, 255, 0.9)');
+    glow.addColorStop(1, 'rgba(140, 60, 220, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 16, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+  const ang = Math.atan2(p.ty - p.y, p.tx - p.x);
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(ang);
+  ctx.strokeStyle = '#3b2a1a';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-16, 0);
+  ctx.lineTo(4, 0);
+  ctx.stroke();
+  ctx.fillStyle = '#e8e2d0';
+  ctx.fillRect(-18, -3, 5, 6);
+  ctx.restore();
+}
+
+function drawWizardTower(ctx: CanvasRenderingContext2D, game: Game, t: Tower): void {
+  const { x, y } = game.pads[t.pad];
+  shadow(ctx, x, y + 4, 36);
+  const w = 40;
+  const h = 64 + t.level * 8;
+  ctx.fillStyle = '#9d93a8';
+  ctx.fillRect(x - w / 2, y - h, w, h);
+  ctx.fillStyle = '#c9c0d2';
+  ctx.fillRect(x - w / 2 + 4, y - h, w - 12, h);
+  // Window
+  ctx.fillStyle = '#3a2350';
+  ctx.beginPath();
+  ctx.arc(x - 2, y - h + 22, 5, Math.PI, 0);
+  ctx.lineTo(x + 3, y - h + 32);
+  ctx.lineTo(x - 7, y - h + 32);
+  ctx.fill();
+  // Tall pointed roof
+  ctx.fillStyle = '#5b2d86';
+  ctx.beginPath();
+  ctx.moveTo(x - w / 2 - 8, y - h);
+  ctx.lineTo(x, y - h - 56);
+  ctx.lineTo(x + w / 2 + 8, y - h);
+  ctx.closePath();
+  ctx.fill();
+  // Glowing orb on top: brighter just after a shot
+  const flash = t.shotAge < 0.25 ? 1 - t.shotAge / 0.25 : 0;
+  const r = 7 + flash * 4;
+  const glow = ctx.createRadialGradient(x, y - h - 60, 0, x, y - h - 60, r * 2.4);
+  glow.addColorStop(0, 'rgba(255, 240, 255, 1)');
+  glow.addColorStop(0.4, `rgba(200, 120, 255, ${0.7 + flash * 0.3})`);
+  glow.addColorStop(1, 'rgba(140, 60, 220, 0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(x, y - h - 60, r * 2.4, 0, Math.PI * 2);
+  ctx.fill();
+  levelPips(ctx, x, y - 12, t.level);
+}
+
+function drawCatapult(ctx: CanvasRenderingContext2D, game: Game, t: Tower): void {
+  const { x, y } = game.pads[t.pad];
+  shadow(ctx, x, y + 4, 44);
+  // Stone platform
+  ctx.fillStyle = C.stoneDark;
+  ctx.fillRect(x - 34, y - 20, 68, 20);
+  ctx.fillStyle = C.stone;
+  ctx.fillRect(x - 30, y - 20, 56, 16);
+  // Wooden frame
+  ctx.strokeStyle = C.wood;
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(x - 20, y - 20);
+  ctx.lineTo(x - 4, y - 52 - t.level * 4);
+  ctx.lineTo(x + 12, y - 20);
+  ctx.stroke();
+  // Throwing arm: flung forward just after a shot, then wound back
+  const spec = game.towerLevel(t.type, t.level)!;
+  const back = Math.min(1, t.shotAge / (spec.cooldown * 0.6));
+  const angle = -0.35 - (1 - back) * 1.6 + back * 0.0;
+  const px = x - 4;
+  const py = y - 48 - t.level * 4;
+  const len = 46;
+  const ex = px + Math.cos(Math.PI + angle) * len;
+  const ey = py + Math.sin(Math.PI + angle) * len * -1;
+  ctx.strokeStyle = '#6b4423';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(px - (ex - px) * 0.3, py - (ey - py) * 0.3);
+  ctx.lineTo(ex, ey);
+  ctx.stroke();
+  // Stone in the bucket once loaded
+  if (back >= 1) {
+    ctx.fillStyle = '#7d766a';
+    ctx.beginPath();
+    ctx.arc(ex, ey - 6, 7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  levelPips(ctx, x, y - 8, t.level);
+}
+
 function drawTower(ctx: CanvasRenderingContext2D, game: Game, t: Tower): void {
   if (t.type === 'knights') return drawHall(ctx, game, t);
+  if (t.type === 'wizard') return drawWizardTower(ctx, game, t);
+  if (t.type === 'catapult') return drawCatapult(ctx, game, t);
   const { x, y } = game.pads[t.pad];
   shadow(ctx, x, y + 4, 40);
   const recoil = t.shotAge < 0.1 ? 2 : 0;
@@ -546,9 +691,23 @@ function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, roadLength: number):
   ctx.globalAlpha = Math.max(0, Math.min(1, e.d / 60, (roadLength - e.d) / 60));
   const r = e.spec.size;
   const look = ENEMY_LOOK[e.type] ?? { body: '#999', belly: '#ccc' };
-  const bob = Math.abs(Math.sin(e.d / 9)) * 3;
-  shadow(ctx, e.x, e.y, r);
-  const cy = e.y - r - bob;
+  const flying = !!e.spec.flying;
+  const bob = flying ? Math.sin(e.d / 14) * 4 : Math.abs(Math.sin(e.d / 9)) * 3;
+  shadow(ctx, e.x, e.y, flying ? r * 0.7 : r);
+  const cy = e.y - r - bob - (flying ? FLY_HEIGHT : 0);
+  if (flying) {
+    // Flapping wings behind the body
+    const flap = Math.sin(e.d / 6) * 0.6;
+    ctx.fillStyle = look.belly;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(e.x + side * r * 0.4, cy);
+      ctx.lineTo(e.x + side * r * 2.2, cy - r * (0.8 + flap));
+      ctx.lineTo(e.x + side * r * 1.6, cy + r * 0.4);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
   ctx.fillStyle = e.hitAge < 0.08 ? '#ffffff' : look.body;
   ctx.beginPath();
   ctx.arc(e.x, cy, r, 0, Math.PI * 2);
@@ -567,6 +726,25 @@ function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, roadLength: number):
   ctx.arc(e.x - r * 0.3, cy - r * 0.25, r * 0.1, 0, Math.PI * 2);
   ctx.arc(e.x + r * 0.4, cy - r * 0.25, r * 0.1, 0, Math.PI * 2);
   ctx.fill();
+  if (e.type === 'hexling') {
+    // Pointed hood
+    ctx.fillStyle = look.body;
+    ctx.beginPath();
+    ctx.moveTo(e.x - r * 0.8, cy - r * 0.5);
+    ctx.lineTo(e.x + r * 0.2, cy - r * 2);
+    ctx.lineTo(e.x + r * 0.8, cy - r * 0.5);
+    ctx.fill();
+  }
+  if ((e.spec.magicResist ?? 0) > 0) {
+    // Shimmer: magic slides off
+    ctx.strokeStyle = 'rgba(220, 170, 255, 0.85)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.arc(e.x, cy, r + 4, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
   if (e.spec.armor > 0) {
     ctx.strokeStyle = '#d9dde3';
     ctx.lineWidth = 3;

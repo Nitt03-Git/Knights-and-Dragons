@@ -12,6 +12,8 @@ export const STEP = 1 / 60;
 export const ENGAGE_RANGE = 95;
 /** How close a tapped point must be to the road to move a flag there. */
 export const FLAG_SNAP = 70;
+/** How high flying enemies fly above the road (drawing and aiming only). */
+export const FLY_HEIGHT = 45;
 /** Where the knights of a hall stand across the road, around the flag. */
 const POSTS: [number, number][] = [[0, -22], [-14, 0], [0, 22]];
 
@@ -73,21 +75,31 @@ export interface Tower {
 }
 
 export interface Projectile {
+  /** Arrows and bolts follow their target; shells fly to a spot on the ground and splash. */
+  kind: 'arrow' | 'bolt' | 'shell';
   x: number;
   y: number;
+  sx: number;
+  sy: number;
   target: number;
   tx: number;
   ty: number;
   speed: number;
   damage: number;
   damageType: DamageType;
+  pierce: number;
+  splash: number;
+  /** Shells: share of the flight done (0..1) and its length in seconds. */
+  t: number;
+  flight: number;
   done: boolean;
 }
 
 export type GameEvent =
   | { kind: 'gold'; x: number; y: number; amount: number }
   | { kind: 'leak'; x: number; y: number; lives: number }
-  | { kind: 'wave'; wave: number; bonus: number };
+  | { kind: 'wave'; wave: number; bonus: number }
+  | { kind: 'boom'; x: number; y: number; radius: number };
 
 interface Spawner {
   enemy: string;
@@ -97,9 +109,9 @@ interface Spawner {
   timer: number;
 }
 
-/** Damage after armor (physical) or magic resistance (magic). */
-export function damageAfterDefence(amount: number, type: DamageType, spec: { armor: number; magicResist?: number }): number {
-  const block = type === 'physical' ? spec.armor : (spec.magicResist ?? 0);
+/** Damage after armor (physical, minus the share `pierce` ignores) or magic resistance (magic). */
+export function damageAfterDefence(amount: number, type: DamageType, spec: { armor: number; magicResist?: number }, pierce = 0): number {
+  const block = type === 'physical' ? spec.armor * (1 - pierce) : (spec.magicResist ?? 0);
   return amount * (1 - block);
 }
 
@@ -366,22 +378,36 @@ export class Game {
       t.cooldown -= dt;
       if (t.cooldown > 0) continue;
       const pad = this.pads[t.pad];
-      const target = this.pickTarget(pad.x, pad.y, spec.range);
+      const splash = spec.splash ?? 0;
+      const target = this.pickTarget(pad.x, pad.y, spec.range, splash === 0);
       if (!target) {
         t.cooldown = 0;
         continue;
       }
-      this.projectiles.push({
+      const base = {
         x: pad.x,
         y: pad.y - 50,
+        sx: pad.x,
+        sy: pad.y - 50,
         target: target.id,
-        tx: target.x,
-        ty: target.y,
-        speed: 900,
         damage: this.roll(spec.damage),
         damageType: spec.damageType,
+        pierce: spec.armorPierce ?? 0,
+        splash,
+        t: 0,
+        flight: 0,
         done: false,
-      });
+      };
+      if (splash > 0) {
+        // Aim where the target will be when the shell comes down.
+        const flight = 0.6 + Math.hypot(target.x - pad.x, target.y - pad.y) / 500;
+        const ahead = target.heldBy === null ? target.spec.speed * flight : 0;
+        const path = this.paths[target.path];
+        const spot = pointAt(path, Math.min(path.length, target.d + ahead), target.lane);
+        this.projectiles.push({ ...base, kind: 'shell', tx: spot.x, ty: spot.y, speed: 0, flight });
+      } else {
+        this.projectiles.push({ ...base, kind: spec.damageType === 'magic' ? 'bolt' : 'arrow', tx: target.x, ty: target.y, speed: spec.damageType === 'magic' ? 650 : 900 });
+      }
       t.cooldown = spec.cooldown;
       t.shotAge = 0;
     }
@@ -494,11 +520,11 @@ export class Game {
   }
 
   /** The enemy in range that is furthest along its road. */
-  private pickTarget(x: number, y: number, range: number): Enemy | null {
+  private pickTarget(x: number, y: number, range: number, hitsFlying: boolean): Enemy | null {
     let best: Enemy | null = null;
     let bestLeft = Infinity;
     for (const e of this.enemies) {
-      if (!e.alive || Math.hypot(e.x - x, e.y - y) > range) continue;
+      if (!e.alive || (e.spec.flying && !hitsFlying) || Math.hypot(e.x - x, e.y - y) > range) continue;
       const left = this.paths[e.path].length - e.d;
       if (left < bestLeft) {
         best = e;
@@ -510,10 +536,23 @@ export class Game {
 
   private updateProjectiles(dt: number): void {
     for (const p of this.projectiles) {
+      if (p.kind === 'shell') {
+        p.t = Math.min(1, p.t + dt / p.flight);
+        p.x = p.sx + (p.tx - p.sx) * p.t;
+        p.y = p.sy + (p.ty - p.sy) * p.t;
+        if (p.t >= 1) {
+          p.done = true;
+          this.events.push({ kind: 'boom', x: p.tx, y: p.ty, radius: p.splash });
+          for (const e of this.enemies) {
+            if (e.alive && !e.spec.flying && Math.hypot(e.x - p.tx, e.y - p.ty) <= p.splash) this.hit(e, p.damage, p.damageType, p.pierce);
+          }
+        }
+        continue;
+      }
       const target = this.enemyById.get(p.target);
       if (target?.alive) {
         p.tx = target.x;
-        p.ty = target.y - target.spec.size;
+        p.ty = target.y - target.spec.size - (target.spec.flying ? FLY_HEIGHT : 0);
       }
       const dx = p.tx - p.x;
       const dy = p.ty - p.y;
@@ -521,7 +560,7 @@ export class Game {
       const move = p.speed * dt;
       if (dist <= move) {
         p.done = true;
-        if (target?.alive) this.hit(target, p.damage, p.damageType);
+        if (target?.alive) this.hit(target, p.damage, p.damageType, p.pierce);
       } else {
         p.x += (dx / dist) * move;
         p.y += (dy / dist) * move;
@@ -529,8 +568,8 @@ export class Game {
     }
   }
 
-  private hit(e: Enemy, amount: number, type: DamageType): void {
-    e.hp -= damageAfterDefence(amount, type, e.spec);
+  private hit(e: Enemy, amount: number, type: DamageType, pierce = 0): void {
+    e.hp -= damageAfterDefence(amount, type, e.spec, pierce);
     e.hitAge = 0;
     if (e.hp <= 0 && e.alive) {
       e.alive = false;

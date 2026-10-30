@@ -27,6 +27,10 @@ export interface TowerLevel {
   cooldown: number;
   damage: [number, number];
   damageType: DamageType;
+  /** Catapults: shots land on the ground and hurt everything within this radius (never flyers). */
+  splash?: number;
+  /** 0..1, share of the target's armor that this damage ignores. */
+  armorPierce?: number;
   /** Present on halls: the units they send to the road. */
   unit?: UnitStats;
 }

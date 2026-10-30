@@ -138,3 +138,43 @@ describe('knights', () => {
     expect(t.rally!.d).not.toBe(start.d);
   });
 });
+
+describe('wizards, catapults and flyers', () => {
+  const base = LEVELS[0];
+  const onlyWave = (enemy: string, count: number, interval: number) => ({ ...base, waves: [{ groups: [{ enemy, count, interval }] }] });
+
+  it('a catapult shell hurts every enemy in its splash', () => {
+    const g = new Game(onlyWave('brute', 6, 0.15), BALANCE);
+    g.gold = 1e6;
+    g.build(2, 'catapult');
+    g.callWave();
+    let hurtAtOnce = 0;
+    for (let i = 0; i < 60 * 60 && !g.isOver(); i++) {
+      g.step();
+      if (g.events.some((e) => e.kind === 'boom')) hurtAtOnce = Math.max(hurtAtOnce, g.enemies.filter((e) => e.hitAge === 0).length);
+      g.events.length = 0;
+    }
+    expect(hurtAtOnce).toBeGreaterThan(1);
+  });
+
+  it('catapults never shoot at flyers, knights never hold them', () => {
+    const g = new Game(onlyWave('wyrmling', 6, 1), BALANCE);
+    g.gold = 1e6;
+    g.build(2, 'catapult');
+    g.build(3, 'knights');
+    g.callWave();
+    for (let i = 0; i < 60 * 90 && !g.isOver(); i++) {
+      g.step();
+      expect(g.projectiles.length).toBe(0);
+      expect(g.enemies.every((e) => e.heldBy === null && e.hp === e.spec.hp)).toBe(true);
+    }
+    expect(g.lives).toBe(BALANCE.rules.lives - 6);
+  });
+
+  it('wizards ignore armor, archers do not', () => {
+    const brute = BALANCE.enemies.brute;
+    expect(damageAfterDefence(10, 'magic', brute)).toBe(10);
+    expect(damageAfterDefence(10, 'physical', brute)).toBeLessThan(10);
+    expect(damageAfterDefence(10, 'physical', brute, 0.5)).toBeCloseTo(10 * (1 - brute.armor / 2));
+  });
+});
