@@ -32,6 +32,8 @@ If it still shows an older build, wait a few minutes: GitHub Pages caches the pa
 - Pinch to zoom in and out; drag the map to look around when zoomed in.
 - Pick a level. Each level opens once you've won the one before; your best stars are kept on
   this phone (clearing Chrome's site data for the game resets them).
+- Pick a level. Each level opens once you've won the one before; your best stars are kept on
+  this phone (clearing Chrome's site data for the game resets them).
 - Tap **⚔ Start wave 1** when you're ready. Later waves start by themselves; calling them
   early gives bonus gold.
 - Each enemy that reaches the end of the road costs lives. Win with 18+ lives left for 3 stars.
