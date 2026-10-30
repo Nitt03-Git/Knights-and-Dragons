@@ -45,6 +45,8 @@ export interface UnitStats {
   /** Health per second regained while not fighting. */
   regen: number;
   speed: number;
+  /** How many enemies one unit can hold in place at the same time. */
+  holds: number;
 }
 
 export interface TowerSpec {

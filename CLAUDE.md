@@ -8,6 +8,7 @@ Full plan, decisions and milestones: `PLAN.md` (keep it up to date when the owne
 
 ## Rules
 
+- The owner may edit `data/*.json` directly on GitHub: `git pull` before starting work.
 - Every push runs `.github/workflows/pages.yml` (type check, tests, build). Pushes to `main`
   publish to https://nitt03-git.github.io/Knights-and-Dragons/. After pushing, check the
   Actions run is green, then tell the owner what to try on the phone.
@@ -20,9 +21,11 @@ Full plan, decisions and milestones: `PLAN.md` (keep it up to date when the owne
 - `src/sim.ts` is the rules only (no DOM, no drawing, fixed 1/60 s steps, seeded random).
   `src/render.ts` only draws; `src/main.ts` is the screen, input and loop.
 - Stats and rules live in `data/balance.json`, levels in `data/levels.json` (world units,
-  map 1600×900, landscape). After a balance or level change, run `npm run check --
-  --silent=false` and read the bot table from `test/balance.test.ts`; keep its guard rails
-  passing or change them on purpose and say why.
+  map 1600×900, landscape). After a balance or level change, run `npm run balance` and read
+  the bot table (`test/balance.test.ts`); keep its guard rails passing or change them on
+  purpose and say why. It is not part of `npm run check` on purpose: the owner may tweak
+  `data/balance.json` on GitHub (see `TUNING.md`) and that must never be blocked from
+  publishing by the bot. Data sanity checks (ranges, known enemies, pads) do run in `check`.
 - No network calls, no trackers, no external scripts or fonts (fonts are bundled via
   @fontsource). README's privacy section must stay true.
 

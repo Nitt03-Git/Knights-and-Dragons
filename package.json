@@ -1,13 +1,14 @@
 {
   "name": "knights-and-dragons",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
-    "check": "tsc --noEmit && vitest run"
+    "check": "tsc --noEmit && vitest run",
+    "balance": "BALANCE=1 vitest run test/balance.test.ts --silent=false"
   },
   "devDependencies": {
     "@fontsource/cinzel": "^5.3.0",

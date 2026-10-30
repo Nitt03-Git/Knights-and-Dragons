@@ -193,3 +193,82 @@ describe('progress', () => {
     expect(saveStars('x', 2)).toEqual({ x: 2 });
   });
 });
+
+describe('knights holding several enemies', () => {
+  it('a knight holds up to `holds` enemies at once', () => {
+    const balance = structuredClone(BALANCE);
+    for (const l of balance.towers.knights.levels) l.unit!.holds = 3;
+    const level = { ...LEVELS[0], waves: [{ groups: [{ enemy: 'brute', count: 12, interval: 0.3 }] }] };
+    const g = new Game(level, balance);
+    g.build(0, 'knights');
+    g.callWave();
+    let most = 0;
+    for (let i = 0; i < 60 * 60 && !g.isOver(); i++) {
+      g.step();
+      for (const k of g.towers[0]!.knights) most = Math.max(most, k.holding.length);
+      for (const e of g.enemies) if (e.heldBy !== null) expect(g.towers[0]!.knights.find((k) => k.id === e.heldBy)!.holding).toContain(e.id);
+    }
+    expect(most).toBeGreaterThan(1);
+    expect(most).toBeLessThanOrEqual(3);
+  });
+});
+
+describe('data/balance.json makes sense', () => {
+  const share = (v: number | undefined) => v === undefined || (v >= 0 && v <= 0.95);
+  const range = ([lo, hi]: [number, number]) => lo >= 0 && hi >= lo;
+
+  it('rules', () => {
+    const r = BALANCE.rules;
+    expect(r.startGold).toBeGreaterThanOrEqual(0);
+    expect(r.lives).toBeGreaterThanOrEqual(1);
+    expect(share(r.sellRefund)).toBe(true);
+    expect(r.waveGap).toBeGreaterThan(0);
+  });
+
+  for (const [type, tower] of Object.entries(BALANCE.towers)) {
+    it(`tower ${type}`, () => {
+      expect(tower.levels.length).toBeGreaterThan(0);
+      for (const l of tower.levels) {
+        expect(l.cost).toBeGreaterThan(0);
+        expect(l.range).toBeGreaterThan(0);
+        expect(l.cooldown).toBeGreaterThan(0);
+        expect(range(l.damage)).toBe(true);
+        expect(share(l.armorPierce)).toBe(true);
+        if (l.unit) {
+          expect(l.unit.count).toBeGreaterThanOrEqual(1);
+          expect(l.unit.hp).toBeGreaterThan(0);
+          expect(share(l.unit.armor)).toBe(true);
+          expect(Number.isInteger(l.unit.holds) && l.unit.holds >= 1).toBe(true);
+          expect(l.unit.respawn).toBeGreaterThanOrEqual(0);
+          expect(l.unit.speed).toBeGreaterThan(0);
+        }
+      }
+    });
+  }
+
+  for (const [type, e] of Object.entries(BALANCE.enemies)) {
+    it(`enemy ${type}`, () => {
+      expect(e.hp).toBeGreaterThan(0);
+      expect(e.speed).toBeGreaterThan(0);
+      expect(share(e.armor)).toBe(true);
+      expect(share(e.magicResist)).toBe(true);
+      expect(e.bounty).toBeGreaterThanOrEqual(0);
+      expect(e.lifeCost).toBeGreaterThanOrEqual(1);
+      expect(range(e.attack)).toBe(true);
+      expect(e.attackCooldown).toBeGreaterThan(0);
+    });
+  }
+
+  for (const level of LEVELS) {
+    it(`level ${level.id}: waves`, () => {
+      expect(level.waves.length).toBeGreaterThan(0);
+      for (const w of level.waves) {
+        for (const g of w.groups) {
+          expect(g.count).toBeGreaterThanOrEqual(1);
+          expect(g.interval).toBeGreaterThan(0);
+          expect(level.paths[g.path ?? 0]).toBeDefined();
+        }
+      }
+    });
+  }
+});

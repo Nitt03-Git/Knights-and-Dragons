@@ -98,6 +98,11 @@ Each one is a version the owner can play from the link.
   walked right to left, 8 waves). Levels may set their own `startGold`. The bot now plays
   every level with an automatic plan (best-covering spots first, mixed towers); full
   defences win levels 2 and 3 with 2 stars but with fewer lives to spare than level 1.
+- **0.5.1 ✅**: tuning made easy (owner's wish before the hero and specials arrive): how many
+  enemies a knight holds is now a number (`holds`, 1 for now); `TUNING.md` explains every
+  number in plain words, with steps to change one on GitHub from the phone. Data mistakes
+  (typos, armor above 0.95…) still block publishing; the bot's balance report no longer does
+  (`npm run balance`). Owner's stars on 0.5: 1, 3 and 2.
 - **0.6**: Level Studio: draw a road with a finger, place build spots, set waves, then
   "Copy level" and paste it into the chat so Claude adds it to `data/levels.json`.
 - **0.7**: Hero: a knight champion you move by tapping, with 1–2 abilities.
@@ -114,6 +119,8 @@ wording borrowed from other games.
 ## Owner's wishes for later
 
 - Knights should look very different (Phase 2 art), not just recoloured shapes.
+- Specials (abilities you trigger, e.g. a rain of arrows) at some point.
+- Difficulty gets retuned once the hero (and specials) are in.
 
 ## Open questions for the owner
 

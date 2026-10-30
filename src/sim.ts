@@ -10,6 +10,8 @@ export const WORLD_H = 900;
 export const STEP = 1 / 60;
 /** Knights go after enemies this close to their flag. */
 export const ENGAGE_RANGE = 95;
+/** Extra distance at which a fighting knight also stops (and is hit by) other enemies. */
+const HOLD_REACH = 24;
 /** How close a tapped point must be to the road to move a flag there. */
 export const FLAG_SNAP = 70;
 /** How high flying enemies fly above the road (drawing and aiming only). */
@@ -48,7 +50,10 @@ export interface Knight {
   y: number;
   hp: number;
   state: KnightState;
+  /** The enemy this knight is hitting (one it holds, or one a fellow knight holds). */
   target: number | null;
+  /** Enemies this knight holds in place, up to its unit's `holds`. */
+  holding: number[];
   cooldown: number;
   respawnIn: number;
   hitAge: number;
@@ -190,7 +195,7 @@ export class Game {
       const p = this.pads[pad];
       tower.rally = this.defaultRally(pad);
       for (let slot = 0; slot < spec.unit.count; slot++) {
-        tower.knights.push({ id: this.nextId++, pad, slot, x: p.x, y: p.y, hp: spec.unit.hp, state: 'walking', target: null, cooldown: 0, respawnIn: 0, hitAge: 9 });
+        tower.knights.push({ id: this.nextId++, pad, slot, x: p.x, y: p.y, hp: spec.unit.hp, state: 'walking', target: null, holding: [], cooldown: 0, respawnIn: 0, hitAge: 9 });
       }
     }
     this.towers[pad] = tower;
@@ -250,7 +255,10 @@ export class Game {
     const rally = this.rallyFor(pad, x, y);
     if (!t || !rally) return false;
     t.rally = rally;
-    for (const k of t.knights) k.target = null;
+    for (const k of t.knights) {
+      k.target = null;
+      k.holding = [];
+    }
     return true;
   }
 
@@ -341,10 +349,12 @@ export class Game {
       // Held by a knight: stand still and fight back once the knight has arrived.
       if (e.heldBy !== null) {
         const k = this.knightById.get(e.heldBy);
-        if (!k || k.state === 'dead' || k.target !== e.id) e.heldBy = null;
+        if (!k || k.state === 'dead' || !k.holding.includes(e.id)) e.heldBy = null;
         else {
           e.attackCooldown -= dt;
-          if (k.state === 'fighting' && e.attackCooldown <= 0) {
+          // Enemies held next to a fighting knight hit back.
+          const close = Math.hypot(k.x - e.x, k.y - e.y) <= e.spec.size + 14 + HOLD_REACH;
+          if (k.state === 'fighting' && close && e.attackCooldown <= 0) {
             this.hitKnight(k, e.spec.attack);
             e.attackCooldown = e.spec.attackCooldown;
           }
@@ -420,17 +430,40 @@ export class Game {
       k.hitAge += dt;
       if (k.state === 'dead') {
         k.respawnIn -= dt;
-        if (k.respawnIn <= 0) Object.assign(k, { state: 'walking', hp: unit.hp, x: pad.x, y: pad.y, target: null });
+        if (k.respawnIn <= 0) Object.assign(k, { state: 'walking', hp: unit.hp, x: pad.x, y: pad.y, target: null, holding: [] });
         continue;
       }
 
+      k.holding = k.holding.filter((id) => {
+        const e = this.enemyById.get(id);
+        return !!e?.alive && e.heldBy === k.id;
+      });
       let target = k.target === null ? undefined : this.enemyById.get(k.target);
       if (!target?.alive) {
         k.target = null;
-        target = this.findFoe(t);
+        target = k.holding.length ? this.enemyById.get(k.holding[0]) : this.findFoe(t);
         if (target) k.target = target.id;
       }
-      if (target && target.heldBy === null) target.heldBy = k.id;
+      if (target && target.heldBy === null) {
+        if (k.holding.length < unit.holds) {
+          target.heldBy = k.id;
+          k.holding.push(target.id);
+        } else {
+          // Already holding as many as it can: keep fighting one of those instead.
+          target = this.enemyById.get(k.holding[0]);
+          k.target = target?.id ?? null;
+        }
+      }
+      // A knight standing in the road also stops other enemies that walk into it, up to `holds`.
+      if (k.state === 'fighting' && k.holding.length < unit.holds) {
+        for (const e of this.enemies) {
+          if (k.holding.length >= unit.holds) break;
+          if (!e.alive || e.spec.flying || e.heldBy !== null) continue;
+          if (Math.hypot(e.x - k.x, e.y - k.y) > e.spec.size + 14 + HOLD_REACH) continue;
+          e.heldBy = k.id;
+          k.holding.push(e.id);
+        }
+      }
 
       if (target) {
         const reach = target.spec.size + 14;
@@ -494,6 +527,11 @@ export class Game {
       k.state = 'dead';
       k.respawnIn = unit.respawn;
       k.target = null;
+      for (const id of k.holding) {
+        const e = this.enemyById.get(id);
+        if (e?.heldBy === k.id) e.heldBy = null;
+      }
+      k.holding = [];
     }
   }
 

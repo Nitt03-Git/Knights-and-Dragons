@@ -51,4 +51,4 @@ npm run check    # type check and tests (includes a bot that plays level 1)
 npm run build    # production build in dist/
 ```
 
-Plan and milestones: [PLAN.md](PLAN.md).
+Plan and milestones: [PLAN.md](PLAN.md). Every gameplay number and how to change it: [TUNING.md](TUNING.md).

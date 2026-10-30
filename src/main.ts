@@ -9,7 +9,7 @@ import { fitView, panView, Renderer, toScreen, toWorld, zoomView, type Overlay, 
 import { isUnlocked, loadProgress, saveStars } from './progress';
 import { Game, STEP } from './sim';
 
-const VERSION = '0.5';
+const VERSION = '0.5.1';
 
 /** Towers in the build ring, clockwise from top-left. */
 const BUILD_RING: { type: string; icon: string; label: string; angle: number; soon?: string }[] = [

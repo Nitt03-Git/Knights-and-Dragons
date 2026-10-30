@@ -3,9 +3,12 @@ import { autoPlan, LEVELS, playBot } from './bot';
 
 // Balance guard rails, played by the simple bot in test/bot.ts with a mixed plan per level:
 // a full defence wins every level, two towers lose. The printed table is the quickest way to
-// see what a balance change did.
+// see what a balance change did. Run with `npm run balance`; it is left out of `npm run check`
+// so the owner's own tweaks to data/balance.json are never blocked from publishing.
+const env = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {};
+
 for (const level of LEVELS) {
-  it(`${level.name}: a full defence wins, two towers lose`, () => {
+  it.skipIf(!env.BALANCE)(`${level.name}: a full defence wins, two towers lose`, () => {
     const plan = autoPlan(level);
     const rows: string[] = [];
     const results: { towers: number; phase: string }[] = [];
