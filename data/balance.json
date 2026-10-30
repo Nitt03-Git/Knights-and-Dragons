@@ -57,9 +57,9 @@
   },
   "enemies": {
     "kobold": {"name": "Kobold Runner", "hp": 50, "speed": 70, "armor": 0, "magicResist": 0, "bounty": 6, "lifeCost": 1, "size": 14, "attack": [2, 4], "attackCooldown": 1.0},
-    "brute": {"name": "Scaled Brute", "hp": 190, "speed": 44, "armor": 0.3, "magicResist": 0, "bounty": 16, "lifeCost": 1, "size": 19, "attack": [6, 10], "attackCooldown": 1.2},
-    "troll": {"name": "Bridge Troll", "hp": 850, "speed": 30, "armor": 0.2, "magicResist": 0, "bounty": 60, "lifeCost": 3, "size": 28, "attack": [22, 32], "attackCooldown": 1.6},
-    "hexling": {"name": "Hexling", "hp": 130, "speed": 52, "armor": 0, "magicResist": 0.6, "bounty": 14, "lifeCost": 1, "size": 14, "attack": [4, 7], "attackCooldown": 1.0},
-    "wyrmling": {"name": "Wyrmling", "hp": 90, "speed": 66, "armor": 0, "magicResist": 0, "bounty": 14, "lifeCost": 1, "size": 15, "attack": [0, 0], "attackCooldown": 1, "flying": true}
+    "brute": {"name": "Scaled Brute", "hp": 190, "speed": 44, "armor": 0.3, "magicResist": 0, "bounty": 20, "lifeCost": 1, "size": 19, "attack": [6, 10], "attackCooldown": 1.2},
+    "troll": {"name": "Bridge Troll", "hp": 850, "speed": 30, "armor": 0.2, "magicResist": 0, "bounty": 80, "lifeCost": 3, "size": 28, "attack": [22, 32], "attackCooldown": 1.6},
+    "hexling": {"name": "Hexling", "hp": 130, "speed": 52, "armor": 0, "magicResist": 0.6, "bounty": 18, "lifeCost": 1, "size": 14, "attack": [4, 7], "attackCooldown": 1.0},
+    "wyrmling": {"name": "Wyrmling", "hp": 90, "speed": 66, "armor": 0, "magicResist": 0, "bounty": 18, "lifeCost": 1, "size": 15, "attack": [0, 0], "attackCooldown": 1, "flying": true}
   }
 }

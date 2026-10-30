@@ -8,7 +8,7 @@ import { BALANCE, LEVELS } from './data';
 import { fitView, panView, Renderer, toScreen, toWorld, zoomView, type Overlay, type View } from './render';
 import { Game, STEP } from './sim';
 
-const VERSION = '0.4';
+const VERSION = '0.4.1';
 
 /** Towers in the build ring, clockwise from top-left. */
 const BUILD_RING: { type: string; icon: string; label: string; angle: number; soon?: string }[] = [

@@ -89,6 +89,9 @@ Each one is a version the owner can play from the link.
   of level 1. Catapult shells aim where the enemy will be when they land. Balance checked
   with the bot: all four tower types together win with 2 stars, archers alone barely win, so
   mixing towers pays off (the owner expected more towers to make it a little easier).
+- **0.4.1 ✅**: owner lost on 0.4 and asked for more gold from the tougher enemies: Brute
+  16→20, Troll 60→80, Hexling and Wyrmling 14→18 (Kobolds unchanged). Mixed defences of 3–4
+  towers now win; a full one still gets 2 stars from the bot.
 - **0.5**: level select with 3 levels; stars saved on the phone.
 - **0.6**: Level Studio: draw a road with a finger, place build spots, set waves, then
   "Copy level" and paste it into the chat so Claude adds it to `data/levels.json`.
