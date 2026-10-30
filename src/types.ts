@@ -89,6 +89,8 @@ export interface WaveGroup {
 export interface Level {
   id: string;
   name: string;
+  /** Overrides the rules' starting gold for this level. */
+  startGold?: number;
   paths: { points: Point[] }[];
   pads: Point[];
   waves: { groups: WaveGroup[] }[];

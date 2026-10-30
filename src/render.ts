@@ -232,7 +232,7 @@ export class Renderer {
     // A banner where the road leaves the map: that is what the player defends.
     for (const path of game.paths) {
       const end = path.samples[path.samples.length - 1];
-      const x = Math.min(WORLD_W - 30, end.x);
+      const x = Math.max(30, Math.min(WORLD_W - 30, end.x));
       const y = end.y - 70;
       ctx.fillStyle = '#5b3a1e';
       ctx.fillRect(x - 2, y, 5, 60);

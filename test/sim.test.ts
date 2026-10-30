@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildPath, distanceToPath, pointAt } from '../src/path';
+import { isUnlocked, loadProgress, saveStars } from '../src/progress';
 import { damageAfterDefence, Game, WORLD_H, WORLD_W, type Tower } from '../src/sim';
 import { BALANCE, LEVELS } from './bot';
 
@@ -176,5 +177,19 @@ describe('wizards, catapults and flyers', () => {
     expect(damageAfterDefence(10, 'magic', brute)).toBe(10);
     expect(damageAfterDefence(10, 'physical', brute)).toBeLessThan(10);
     expect(damageAfterDefence(10, 'physical', brute, 0.5)).toBeCloseTo(10 * (1 - brute.armor / 2));
+  });
+});
+
+describe('progress', () => {
+  it('opens each level once the one before is won', () => {
+    expect(isUnlocked(LEVELS, 0, {})).toBe(true);
+    expect(isUnlocked(LEVELS, 1, {})).toBe(false);
+    expect(isUnlocked(LEVELS, 1, { [LEVELS[0].id]: 1 })).toBe(true);
+    expect(isUnlocked(LEVELS, 2, { [LEVELS[0].id]: 3 })).toBe(false);
+  });
+
+  it('survives having no storage at all', () => {
+    expect(loadProgress()).toEqual({});
+    expect(saveStars('x', 2)).toEqual({ x: 2 });
   });
 });

@@ -226,7 +226,7 @@ button.pill:active {
   border: 3px solid var(--rim);
   border-radius: 22px;
   padding: 18px 28px 20px;
-  max-width: 420px;
+  max-width: 460px;
   width: 100%;
   text-align: center;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
@@ -254,6 +254,48 @@ button.pill:active {
   margin: 6px 0;
   color: var(--muted);
   font-size: 15px;
+}
+
+.levels {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+button.level {
+  width: 128px;
+  padding: 10px 6px;
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+button.level .num {
+  font-family: Cinzel, serif;
+  font-size: 22px;
+  color: var(--gold);
+}
+
+button.level .name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+button.level .stars {
+  font-size: 18px;
+  letter-spacing: 2px;
+  color: var(--gold);
+}
+
+button.level .stars .off {
+  color: #5a4a35;
+}
+
+button.level.locked {
+  opacity: 0.5;
 }
 
 .card .stars {

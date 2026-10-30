@@ -92,7 +92,12 @@ Each one is a version the owner can play from the link.
 - **0.4.1 ✅**: owner lost on 0.4 and asked for more gold from the tougher enemies: Brute
   16→20, Troll 60→80, Hexling and Wyrmling 14→18 (Kobolds unchanged). Mixed defences of 3–4
   towers now win; a full one still gets 2 stars from the bot.
-- **0.5**: level select with 3 levels; stars saved on the phone.
+- **0.5 ✅**: level select with 3 levels; each opens when the one before is won; best stars
+  saved in the phone's browser (`src/progress.ts`, localStorage, safe when storage is blocked).
+  New: **Twin Fords** (two roads that merge, 7 waves) and **Ember Pass** (long winding road
+  walked right to left, 8 waves). Levels may set their own `startGold`. The bot now plays
+  every level with an automatic plan (best-covering spots first, mixed towers); full
+  defences win levels 2 and 3 with 2 stars but with fewer lives to spare than level 1.
 - **0.6**: Level Studio: draw a road with a finger, place build spots, set waves, then
   "Copy level" and paste it into the chat so Claude adds it to `data/levels.json`.
 - **0.7**: Hero: a knight champion you move by tapping, with 1–2 abilities.

@@ -146,7 +146,7 @@ export class Game {
     this.pads = level.pads.map(([x, y]) => ({ x, y }));
     this.towers = level.pads.map(() => null);
     this.totalWaves = level.waves.length;
-    this.gold = balance.rules.startGold;
+    this.gold = level.startGold ?? balance.rules.startGold;
     this.lives = balance.rules.lives;
     this.rng = makeRng(seed);
   }

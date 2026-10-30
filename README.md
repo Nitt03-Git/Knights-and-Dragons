@@ -30,6 +30,8 @@ If it still shows an older build, wait a few minutes: GitHub Pages caches the pa
 - To move the knights, drag them (or their flag) to another part of the road. Or tap their
   hall, then **🚩 Move flag**, then tap the road inside the blue circle.
 - Pinch to zoom in and out; drag the map to look around when zoomed in.
+- Pick a level. Each level opens once you've won the one before; your best stars are kept on
+  this phone (clearing Chrome's site data for the game resets them).
 - Tap **⚔ Start wave 1** when you're ready. Later waves start by themselves; calling them
   early gives bonus gold.
 - Each enemy that reaches the end of the road costs lives. Win with 18+ lives left for 3 stars.
@@ -38,7 +40,7 @@ If it still shows an older build, wait a few minutes: GitHub Pages caches the pa
 ## Privacy
 
 The game collects nothing and contacts nothing besides this website (fonts are included).
-It needs no permissions.
+It needs no permissions. Your stars are stored only in your phone's browser.
 
 ## Building (for developers)
 

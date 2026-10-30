@@ -6,9 +6,10 @@ import '@fontsource/fredoka/latin-700.css';
 import './style.css';
 import { BALANCE, LEVELS } from './data';
 import { fitView, panView, Renderer, toScreen, toWorld, zoomView, type Overlay, type View } from './render';
+import { isUnlocked, loadProgress, saveStars } from './progress';
 import { Game, STEP } from './sim';
 
-const VERSION = '0.4.1';
+const VERSION = '0.5';
 
 /** Towers in the build ring, clockwise from top-left. */
 const BUILD_RING: { type: string; icon: string; label: string; angle: number; soon?: string }[] = [
@@ -35,7 +36,8 @@ const ui = {
   version: $('version'),
 };
 
-const level = LEVELS[0];
+let levelIndex = 0;
+let level = LEVELS[0];
 let game = new Game(level, BALANCE);
 let renderer = new Renderer(ctx, game);
 /** The whole map on screen, and the current (possibly zoomed and moved) view. */
@@ -83,19 +85,35 @@ function hideCard(): void {
   ui.overlay.hidden = true;
 }
 
-function showStart(): void {
+function showLevels(): void {
+  paused = true;
+  closeMenu();
+  const progress = loadProgress();
+  const cards = LEVELS.map((l, i) => {
+    const open = isUnlocked(LEVELS, i, progress);
+    const stars = progress[l.id] ?? 0;
+    const starRow = [0, 1, 2].map((s) => `<span class="${s < stars ? '' : 'off'}">★</span>`).join('');
+    return `<button class="pill level${open ? '' : ' locked'}" data-level="${i}" ${open ? '' : 'disabled'}>
+      <span class="num">${open ? i + 1 : '🔒'}</span><span class="name">${l.name}</span><span class="stars">${starRow}</span></button>`;
+  }).join('');
   showCard(
     `<h1>Knights &amp; Dragons</h1>
-     <p>The dragon's horde is coming down <b>${level.name}</b>.</p>
-     <p>Tap a stone spot to build. Bowmen shoot; knights hold the road. Pinch to zoom.</p>
-     <p>Tap <b>⚔ Start</b> when you're ready.</p>`,
-    [{ text: 'Play', main: true, onClick: () => { goFullscreen(); hideCard(); paused = false; } }],
+     <p>Tap a stone spot to build. Bowmen shoot, knights hold the road, wizards ignore armor, catapults hit groups. Pinch to zoom.</p>
+     <div class="levels">${cards}</div>`,
+    [],
   );
+  ui.card.querySelectorAll<HTMLButtonElement>('button.level').forEach((b) => {
+    b.onclick = () => {
+      goFullscreen();
+      startLevel(Number(b.dataset.level));
+    };
+  });
 }
 
 function showPause(): void {
   paused = true;
-  showCard('<h2>Paused</h2>', [
+  showCard(`<h2>Paused</h2><p>${level.name}</p>`, [
+    { text: 'Levels', onClick: showLevels },
     { text: 'Restart', onClick: restart },
     { text: 'Resume', main: true, onClick: () => { hideCard(); paused = false; } },
   ]);
@@ -106,23 +124,35 @@ function showEnd(): void {
   ui.banner.hidden = true;
   const won = game.phase === 'won';
   const stars = game.stars();
+  const best = won ? saveStars(level.id, stars)[level.id] : 0;
   const starRow = [0, 1, 2].map((i) => `<span class="${i < stars ? '' : 'off'}">★</span>`).join('');
+  const next = levelIndex + 1 < LEVELS.length ? levelIndex + 1 : null;
+  const buttons = [{ text: 'Levels', onClick: showLevels }, { text: 'Play again', main: !won || next === null, onClick: restart }];
+  if (won && next !== null) buttons.push({ text: 'Next level', main: true, onClick: () => startLevel(next) });
   showCard(
     won
-      ? `<h2>Victory!</h2><div class="stars">${starRow}</div><p>${level.name} is safe, with ${game.lives} lives left.</p>`
+      ? `<h2>Victory!</h2><div class="stars">${starRow}</div><p>${level.name} is safe, with ${game.lives} lives left.${best > stars ? ` Your best: ${best} ★` : ''}</p>`
       : `<h2>Defeat</h2><p>The horde broke through on wave ${game.wavesStarted} of ${game.totalWaves}.</p>`,
-    [{ text: 'Play again', main: true, onClick: restart }],
+    buttons,
   );
 }
 
-function restart(): void {
+function startLevel(index: number): void {
+  levelIndex = index;
+  level = LEVELS[index];
   game = new Game(level, BALANCE);
   renderer = new Renderer(ctx, game);
+  view = fitted;
   selected = null;
   shownEnd = false;
   closeMenu();
   hideCard();
   paused = false;
+  showBanner(`${level.name}<small>${game.totalWaves} waves · tap ⚔ when ready</small>`, 3);
+}
+
+function restart(): void {
+  startLevel(levelIndex);
 }
 
 function goFullscreen(): void {
@@ -470,5 +500,5 @@ if (new URLSearchParams(location.search).has('debug')) {
   Object.assign(window, { debug: { get game() { return game; }, get view() { return view; }, setPaused: (p: boolean) => (paused = p) } });
 }
 
-showStart();
+showLevels();
 requestAnimationFrame(frame);
