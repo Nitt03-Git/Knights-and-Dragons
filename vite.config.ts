@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 
-// Relative base so the build works at github.io/knights-and-dragons/ and anywhere else.
+// Relative base so the build works at github.io/Knights-and-Dragons/ and anywhere else.
 export default defineConfig({
   base: './',
   define: {

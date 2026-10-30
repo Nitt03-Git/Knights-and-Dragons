@@ -3,7 +3,7 @@
 A fantasy tower-defense game for your phone's browser. Hold the road against the dragon's
 horde with towers built on stone spots.
 
-**Play:** https://nitt03-git.github.io/knights-and-dragons/
+**Play:** https://nitt03-git.github.io/Knights-and-Dragons/
 
 ## Install on your phone
 

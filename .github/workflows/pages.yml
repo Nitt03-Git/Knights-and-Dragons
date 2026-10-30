@@ -1,7 +1,7 @@
 name: Test and publish
 
 # Every push runs the checks. Pushes to main also publish the game to GitHub Pages:
-# https://nitt03-git.github.io/knights-and-dragons/
+# https://nitt03-git.github.io/Knights-and-Dragons/
 on:
   push:
   workflow_dispatch:

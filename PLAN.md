@@ -16,7 +16,7 @@ Other games in the genre are a reference for *feel* only.
 ## How we work
 
 - It's a web game (TypeScript on an HTML canvas, built with Vite). Every push to `main`
-  publishes it to https://nitt03-git.github.io/knights-and-dragons/. The owner plays it in
+  publishes it to https://nitt03-git.github.io/Knights-and-Dragons/. The owner plays it in
   Chrome on Android, ideally added to the home screen (opens full-screen and sideways).
 - The owner works from the phone only; Claude writes the code, tests it in a headless browser
   and with a bot player, and the owner plays and gives feedback.

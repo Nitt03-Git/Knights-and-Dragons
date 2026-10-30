@@ -9,7 +9,7 @@ Full plan, decisions and milestones: `PLAN.md` (keep it up to date when the owne
 ## Rules
 
 - Every push runs `.github/workflows/pages.yml` (type check, tests, build). Pushes to `main`
-  publish to https://nitt03-git.github.io/knights-and-dragons/. After pushing, check the
+  publish to https://nitt03-git.github.io/Knights-and-Dragons/. After pushing, check the
   Actions run is green, then tell the owner what to try on the phone.
 - You can run the game yourself: `npx vite build && npx vite preview`, then drive it with the
   preinstalled Playwright at a phone landscape viewport (e.g. 915×412, `isMobile`, `hasTouch`).
