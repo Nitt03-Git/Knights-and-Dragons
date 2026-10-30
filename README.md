@@ -31,7 +31,8 @@ If it still shows an older build, wait a few minutes: GitHub Pages caches the pa
   hall, then **🚩 Move flag**, then tap the road inside the blue circle.
 - Pinch to zoom in and out; drag the map to look around when zoomed in.
 - Your **hero**, a knight on a horse: tap it, then tap where it should ride (or drag it
-  there). The 🐴 button bottom-left shows its health and also selects it. Spend the stars you
+  there). The 🐴 button bottom-left shows its level, health and experience, and also selects
+  it. Every enemy the hero defeats gives experience; new levels make it stronger. Spend the stars you
   win on its abilities: **🐴 Hero** on the level screen.
 - Pick a level. Each level opens once you've won the one before; your best stars are kept on
   this phone (clearing Chrome's site data for the game resets them).

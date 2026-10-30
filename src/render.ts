@@ -223,9 +223,13 @@ export class Renderer {
     for (const e of game.enemies) if (!e.spec.flying) items.push({ y: e.y, draw: () => drawEnemy(ctx, e, game.paths[e.path].length) });
     game.towers.forEach((t) => {
       const unit = t && game.towerLevel(t.type, t.level)?.unit;
-      if (t && unit) for (const k of t.knights) if (k.state !== 'dead') items.push({ y: k.y, draw: () => drawKnight(ctx, k, unit.hp, game.time) });
+      if (t && unit) {
+        for (const k of t.knights) {
+          if (k.state !== 'dead') items.push({ y: k.y, draw: () => drawKnight(ctx, k, unit.hp, game.time, game.inRally(k)) });
+        }
+      }
     });
-    if (hero.state !== 'dead') items.push({ y: hero.y, draw: () => drawHero(ctx, hero, game.balance.hero.hp, game.time, facing) });
+    if (hero.state !== 'dead') items.push({ y: hero.y, draw: () => drawHero(ctx, hero, game.heroStats().hp, game.time, facing) });
     items.sort((a, b) => a.y - b.y);
     for (const it of items) it.draw();
 
@@ -306,6 +310,7 @@ export class Renderer {
   private drawFloaters(game: Game, dt: number): void {
     for (const ev of game.events) {
       if (ev.kind === 'gold') this.floaters.push({ text: `+${ev.amount}`, color: C.gold, x: ev.x, y: ev.y, age: 0 });
+      if (ev.kind === 'levelUp') this.floaters.push({ text: `Level ${ev.level}!`, color: '#fff3b0', x: ev.x, y: ev.y, age: -0.6 });
       if (ev.kind === 'leak') this.floaters.push({ text: `−${ev.lives} ♥`, color: '#ff6b5a', x: Math.min(ev.x, WORLD_W - 60), y: ev.y - 30, age: 0 });
     }
     const ctx = this.ctx;
@@ -791,7 +796,17 @@ function drawHero(ctx: CanvasRenderingContext2D, h: Hero, maxHp: number, time: n
   }
 }
 
-function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: number, time: number): void {
+function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: number, time: number, rallied: boolean): void {
+  if (rallied) {
+    // Inside the hero's Rallying Banner: a gold glow under the feet.
+    const glow = ctx.createRadialGradient(k.x, k.y, 0, k.x, k.y, 20);
+    glow.addColorStop(0, 'rgba(255, 213, 74, 0.75)');
+    glow.addColorStop(1, 'rgba(255, 213, 74, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.ellipse(k.x, k.y, 20, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
   // Drawn at 10 units and scaled up around the feet.
   ctx.save();
   ctx.translate(k.x, k.y);
@@ -848,6 +863,21 @@ function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: number, tim
     ctx.fillRect(k.x - w / 2 - 1, by - 1, w + 2, 6);
     ctx.fillStyle = f > 0.35 ? '#6fb8ff' : C.hpLow;
     ctx.fillRect(k.x - w / 2, by, w * f, 4);
+  }
+  if (rallied) {
+    // ...and a small gold plus above the head, gently bobbing.
+    const py = cy - r - 20 + Math.sin(time * 4 + k.id) * 1.5;
+    ctx.strokeStyle = 'rgba(60, 40, 10, 0.8)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(k.x - 4, py);
+    ctx.lineTo(k.x + 4, py);
+    ctx.moveTo(k.x, py - 4);
+    ctx.lineTo(k.x, py + 4);
+    ctx.stroke();
+    ctx.strokeStyle = C.gold;
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }
   ctx.restore();
 }

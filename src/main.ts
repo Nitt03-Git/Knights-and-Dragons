@@ -10,7 +10,7 @@ import { buyAbility, isUnlocked, loadAbilities, loadProgress, saveStars, starsTo
 import { Game, STEP } from './sim';
 import type { HeroAbility } from './types';
 
-const VERSION = '0.6.1';
+const VERSION = '0.6.2';
 
 /** Towers in the build ring, clockwise from top-left. */
 const BUILD_RING: { type: string; icon: string; label: string; angle: number; soon?: string }[] = [
@@ -139,7 +139,8 @@ function showHero(): void {
     }).join('');
     showCard(
       `<h2>${hero.name}</h2>
-       <p>Tap the hero, then tap where to ride (or drag it there). It holds two enemies at a time and comes back after falling.</p>
+       <p>Tap the hero, then tap where to ride (or drag it there). It holds two enemies at a time and comes back after falling.
+       Each enemy it defeats gives XP (as much as its gold); new levels (up to ${hero.levels.length + 1}) bring more health, power and armor. XP starts again each battle.</p>
        <p class="spend">★ ${spend} star${spend === 1 ? '' : 's'} to spend</p>
        <div class="abilities">${rows}</div>`,
       [{ text: 'Back', main: true, onClick: showLevels }],
@@ -564,9 +565,13 @@ function updateHud(): void {
   }
   for (const update of ring) update();
   const h = game.hero;
-  const pill = h.state === 'dead'
-    ? `🐴 back in ${Math.ceil(h.respawnIn)}s`
-    : `🐴 <span class="bar"><i style="width:${Math.round((100 * h.hp) / BALANCE.hero.hp)}%"></i></span>`;
+  const next = game.heroNextXp();
+  const prev = h.level > 1 ? BALANCE.hero.levels[h.level - 2].xp : 0;
+  const xp = next === null ? 100 : Math.round((100 * (h.xp - prev)) / (next - prev));
+  const pill = `🐴 <b>${h.level}</b>` + (h.state === 'dead'
+    ? ` back in ${Math.ceil(h.respawnIn)}s`
+    : `<span class="bars"><span class="bar"><i style="width:${Math.round((100 * h.hp) / game.heroStats().hp)}%"></i></span>` +
+      `<span class="bar xp"><i style="width:${xp}%"></i></span></span>`);
   if (ui.heroPill.innerHTML !== pill) ui.heroPill.innerHTML = pill;
   ui.heroPill.classList.toggle('selected', heroSelected);
 }

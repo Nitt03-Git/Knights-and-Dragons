@@ -76,6 +76,9 @@ export interface Hero {
   /** Seconds until the stomp is ready again, and since the last one (for drawing). */
   stompIn: number;
   stompAge: number;
+  /** Experience this battle, and the level it brought (1 = starting level). */
+  xp: number;
+  level: number;
 }
 
 /** Anything that holds enemies in place and gets hit by them. */
@@ -126,7 +129,8 @@ export type GameEvent =
   | { kind: 'gold'; x: number; y: number; amount: number }
   | { kind: 'leak'; x: number; y: number; lives: number }
   | { kind: 'wave'; wave: number; bonus: number }
-  | { kind: 'boom'; x: number; y: number; radius: number; stomp?: boolean };
+  | { kind: 'boom'; x: number; y: number; radius: number; stomp?: boolean }
+  | { kind: 'levelUp'; x: number; y: number; level: number };
 
 interface Spawner {
   enemy: string;
@@ -195,6 +199,8 @@ export class Game {
       dest: null,
       stompIn: 0,
       stompAge: 9,
+      xp: 0,
+      level: 1,
     };
   }
 
@@ -318,6 +324,17 @@ export class Game {
     this.release(h);
     h.target = null;
     return true;
+  }
+
+  /** The hero's health, sword and armor at its current level. */
+  heroStats(): { hp: number; damage: [number, number]; armor: number } {
+    const spec = this.balance.hero;
+    return this.hero.level > 1 ? spec.levels[this.hero.level - 2] : spec;
+  }
+
+  /** XP needed for the hero's next level, or null at the top level. */
+  heroNextXp(): number | null {
+    return this.balance.hero.levels[this.hero.level - 1]?.xp ?? null;
   }
 
   /** Whether a knight stands close enough to the hero to get the rally ability's boost. */
@@ -538,7 +555,7 @@ export class Game {
     h.stompAge += dt;
     if (h.state === 'dead') {
       h.respawnIn -= dt;
-      if (h.respawnIn <= 0) Object.assign(h, { state: 'walking', hp: spec.hp, x: h.home.x, y: h.home.y, target: null, holding: [], dest: null });
+      if (h.respawnIn <= 0) Object.assign(h, { state: 'walking', hp: this.heroStats().hp, x: h.home.x, y: h.home.y, target: null, holding: [], dest: null });
       return;
     }
     h.holding = h.holding.filter((id) => {
@@ -560,7 +577,8 @@ export class Game {
         this.walk(h, h.dest.x, h.dest.y, spec.speed * dt);
       }
     } else {
-      this.fight(h, spec, spec.damage, spec.cooldown, 'physical', h.home, spec.engageRange, dt);
+      const stats = this.heroStats();
+      this.fight(h, { ...spec, hp: stats.hp }, stats.damage, spec.cooldown, 'physical', h.home, spec.engageRange, dt);
     }
 
     if (this.abilities.has('stomp')) {
@@ -569,7 +587,7 @@ export class Game {
       if (h.stompIn === 0) {
         const hits = this.enemies.filter((e) => e.alive && !e.spec.flying && Math.hypot(e.x - h.x, e.y - h.y) <= stomp.radius);
         if (hits.length) {
-          for (const e of hits) this.hit(e, stomp.damage, 'physical', 1);
+          for (const e of hits) this.hit(e, stomp.damage, 'physical', 1, true);
           this.events.push({ kind: 'boom', x: h.x, y: h.y, radius: stomp.radius, stomp: true });
           h.stompIn = stomp.every;
           h.stompAge = 0;
@@ -623,7 +641,7 @@ export class Game {
         k.state = 'fighting';
         k.cooldown -= dt;
         if (k.cooldown <= 0) {
-          this.hit(target, this.roll(damage), damageType);
+          this.hit(target, this.roll(damage), damageType, 0, k === this.hero);
           k.cooldown = cooldown;
         }
       }
@@ -653,7 +671,7 @@ export class Game {
     let respawn: number;
     let boost = 1;
     if (k === this.hero) {
-      armor = this.balance.hero.armor;
+      armor = this.heroStats().armor;
       respawn = this.balance.hero.respawn;
     } else {
       const t = this.towers[(k as Knight).pad];
@@ -744,13 +762,25 @@ export class Game {
     }
   }
 
-  private hit(e: Enemy, amount: number, type: DamageType, pierce = 0): void {
+  private hit(e: Enemy, amount: number, type: DamageType, pierce = 0, byHero = false): void {
     e.hp -= damageAfterDefence(amount, type, e.spec, pierce);
     e.hitAge = 0;
     if (e.hp <= 0 && e.alive) {
       e.alive = false;
       this.gold += e.spec.bounty;
       this.events.push({ kind: 'gold', x: e.x, y: e.y - e.spec.size * 2, amount: e.spec.bounty });
+      if (byHero) this.gainXp(e.spec.bounty);
+    }
+  }
+
+  /** The hero earns XP (the defeated enemy's gold); each new level heals it fully. */
+  private gainXp(xp: number): void {
+    const h = this.hero;
+    h.xp += xp;
+    for (let next = this.heroNextXp(); next !== null && h.xp >= next; next = this.heroNextXp()) {
+      h.level++;
+      if (h.state !== 'dead') h.hp = this.heroStats().hp;
+      this.events.push({ kind: 'levelUp', x: h.x, y: h.y - 90, level: h.level });
     }
   }
 

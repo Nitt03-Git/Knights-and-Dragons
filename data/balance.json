@@ -1,8 +1,14 @@
 {
   "rules": {"startGold": 240, "lives": 20, "sellRefund": 0.7, "waveGap": 25, "earlyBonusPerSecond": 1, "starLives": [18, 10], "laneOffsets": [-20, 0, 20], "laneJitter": 4},
   "hero": {
-    "name": "Roach the Mounted Knight",
+    "name": "Roch the Mounted Knight",
     "hp": 240, "armor": 0.3, "damage": [10, 15], "cooldown": 0.9, "speed": 150, "regen": 8, "respawn": 20, "holds": 2, "engageRange": 100,
+    "levels": [
+      {"xp": 60, "hp": 280, "damage": [12, 18], "armor": 0.32},
+      {"xp": 160, "hp": 320, "damage": [14, 21], "armor": 0.35},
+      {"xp": 320, "hp": 370, "damage": [17, 25], "armor": 0.38},
+      {"xp": 550, "hp": 430, "damage": [20, 30], "armor": 0.4}
+    ],
     "rally": {"name": "Rallying Banner", "cost": 2, "radius": 160, "hpBoost": 0.2},
     "stomp": {"name": "Thundering Hooves", "cost": 2, "every": 15, "radius": 90, "damage": 35}
   },

@@ -233,6 +233,17 @@ describe('data/balance.json makes sense', () => {
     expect(r.waveGap).toBeGreaterThan(0);
   });
 
+  it('hero levels grow', () => {
+    let prev = { xp: 0, hp: BALANCE.hero.hp };
+    for (const l of BALANCE.hero.levels) {
+      expect(l.xp).toBeGreaterThan(prev.xp);
+      expect(l.hp).toBeGreaterThan(0);
+      expect(range(l.damage)).toBe(true);
+      expect(share(l.armor)).toBe(true);
+      prev = l;
+    }
+  });
+
   for (const [type, tower] of Object.entries(BALANCE.towers)) {
     it(`tower ${type}`, () => {
       expect(tower.levels.length).toBeGreaterThan(0);
@@ -356,5 +367,38 @@ describe('upgrading a hall', () => {
     g.upgrade(0);
     expect(k.state).not.toBe('dead');
     expect(k.hp).toBe(BALANCE.towers.knights.levels[1].unit!.hp);
+  });
+});
+
+describe('hero experience', () => {
+  const level = LEVELS[0];
+
+  it('earns XP only for enemies it defeats itself', () => {
+    const g = new Game({ ...level, waves: [{ groups: [{ enemy: 'kobold', count: 6, interval: 1 }] }] }, BALANCE);
+    g.callWave();
+    while (!g.isOver()) g.step();
+    expect(g.hero.xp).toBeGreaterThan(0);
+    expect(g.hero.xp % BALANCE.enemies.kobold.bounty).toBe(0);
+
+    const far = new Game({ ...level, waves: [{ groups: [{ enemy: 'kobold', count: 6, interval: 1 }] }] }, BALANCE);
+    far.moveHero(100, 850); // far from the road: towers do the work
+    far.gold = 1e6;
+    far.pads.forEach((_, i) => far.build(i, 'archer'));
+    far.callWave();
+    while (!far.isOver()) far.step();
+    expect(far.hero.xp).toBe(0);
+  });
+
+  it('levels up at the XP in balance.json, fully healed and stronger', () => {
+    const g = new Game(level, BALANCE);
+    g.hero.hp = 1;
+    (g as unknown as { gainXp: (xp: number) => void }).gainXp(BALANCE.hero.levels[0].xp);
+    expect(g.hero.level).toBe(2);
+    expect(g.heroStats().hp).toBe(BALANCE.hero.levels[0].hp);
+    expect(g.hero.hp).toBe(BALANCE.hero.levels[0].hp);
+    expect(g.events.some((e) => e.kind === 'levelUp')).toBe(true);
+    (g as unknown as { gainXp: (xp: number) => void }).gainXp(1e6);
+    expect(g.hero.level).toBe(BALANCE.hero.levels.length + 1);
+    expect(g.heroNextXp()).toBeNull();
   });
 });

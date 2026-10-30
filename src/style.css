@@ -377,6 +377,24 @@ button.level.locked {
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35);
 }
 
+.heroPill b {
+  color: var(--gold);
+}
+
+.heroPill .bars {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.heroPill .bar.xp {
+  height: 4px;
+}
+
+.heroPill .bar.xp i {
+  background: var(--gold);
+}
+
 .heroPill .bar {
   width: 64px;
   height: 8px;

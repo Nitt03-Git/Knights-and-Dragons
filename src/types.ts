@@ -85,6 +85,11 @@ export interface HeroSpec {
   holds: number;
   /** How far from where it stands the hero rides out to fight. */
   engageRange: number;
+  /**
+   * Levels after level 1 (which uses the stats above). The hero earns XP equal to the gold
+   * of every enemy it defeats; at `xp` it reaches that level, fully healed, with these stats.
+   */
+  levels: { xp: number; hp: number; damage: [number, number]; armor: number }[];
   /** Ability 1 (passive): knights near the hero take less damage, as if they had `hpBoost` more health. */
   rally: { name: string; cost: number; radius: number; hpBoost: number };
   /** Ability 2: every `every` seconds, `damage` to all ground enemies within `radius` (ignores armor). */

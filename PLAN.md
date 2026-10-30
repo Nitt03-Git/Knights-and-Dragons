@@ -116,6 +116,12 @@ Each one is a version the owner can play from the link.
   with 2 stars again (bot, hero left where it starts, no abilities).
 - **0.6.1 ✅**: hero named **Roach the Mounted Knight**; both abilities cost 2 ★ for testing
   (owner's choice; the planned prices are 5 ★ and 10 ★).
+- **0.6.2 ✅** (owner's feedback): knights inside the Rallying Banner show a gold glow and a
+  gold + ; hero renamed **Roch the Mounted Knight**; hero XP: every enemy Roch defeats (sword
+  or stomp) gives XP equal to its gold; levels 2–5 at 60/160/320/550 XP bring more health,
+  sword damage and armor, and heal him fully. XP starts again each battle (chosen so levels
+  stay balanced; could become permanent later). Level 1 got easier with it (bot: 3 stars
+  with 6 towers); levels 2 and 3 barely changed.
 - **0.7**: Level Studio: draw a road with a finger, place build spots, set waves, then
   "Copy level" and paste it into the chat so Claude adds it to `data/levels.json`.
 - **Later**: branching upgrades, sound, more levels, then Phase 2 and Phase 3.
