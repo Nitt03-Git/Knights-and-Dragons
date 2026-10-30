@@ -10,7 +10,7 @@ import { buyAbility, isUnlocked, loadAbilities, loadProgress, saveStars, starsTo
 import { Game, STEP } from './sim';
 import type { HeroAbility } from './types';
 
-const VERSION = '0.6';
+const VERSION = '0.6.1';
 
 /** Towers in the build ring, clockwise from top-left. */
 const BUILD_RING: { type: string; icon: string; label: string; angle: number; soon?: string }[] = [

@@ -54,11 +54,11 @@ far from the hall the flag may go, and `unit` describes the knights:
 
 | Name | What it does | Now |
 |---|---|---|
-| `name` | Shown on the Hero screen | Mounted Knight |
+| `name` | Shown on the Hero screen | Roach the Mounted Knight |
 | `hp`, `armor`, `regen`, `respawn`, `speed`, `holds` | As for knights | 240, 0.3, 8, 20, 150, 2 |
 | `damage`, `cooldown` | Its sword blows | [10, 15], 0.9 |
 | `engageRange` | How far from where it stands it rides out to fight | 100 |
-| `rally.cost` / `stomp.cost` | Stars to buy each ability | 5 / 10 |
+| `rally.cost` / `stomp.cost` | Stars to buy each ability (2 each while testing) | 2 / 2 |
 | `rally.radius`, `rally.hpBoost` | Rallying Banner: reach, and how much longer knights last (0.2 = 20%) | 160, 0.2 |
 | `stomp.every`, `stomp.damage`, `stomp.radius` | Thundering Hooves: seconds between stamps, damage, reach | 15, 35, 90 |
 

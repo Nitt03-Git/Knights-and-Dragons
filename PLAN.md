@@ -114,6 +114,8 @@ Each one is a version the owner can play from the link.
   Also: upgrading a Knights' Hall brings fallen knights back straight away (owner's request).
   Retuned for the hero: hero 240 hp; all enemies about 10% more health; full defences win
   with 2 stars again (bot, hero left where it starts, no abilities).
+- **0.6.1 ✅**: hero named **Roach the Mounted Knight**; both abilities cost 2 ★ for testing
+  (owner's choice; the planned prices are 5 ★ and 10 ★).
 - **0.7**: Level Studio: draw a road with a finger, place build spots, set waves, then
   "Copy level" and paste it into the chat so Claude adds it to `data/levels.json`.
 - **Later**: branching upgrades, sound, more levels, then Phase 2 and Phase 3.
@@ -134,6 +136,5 @@ wording borrowed from other games.
 
 ## Open questions for the owner
 
-- The hero's name ("Mounted Knight" for now).
-- Thundering Hooves costs 10 ★ but 3 levels give at most 9: lower it, or add a 4th level?
+- Ability prices after testing (planned 5 ★ and 10 ★; 3 levels give at most 9 ★).
 - How many levels for a first "complete" version?
