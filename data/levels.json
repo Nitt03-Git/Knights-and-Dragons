@@ -1,0 +1,22 @@
+{
+  "levels": [
+    {
+      "id": "greenhollow",
+      "name": "Greenhollow Road",
+      "paths": [
+        {
+          "points": [[-140, 220], [350, 215], [540, 290], [530, 520], [350, 675], [670, 750], [990, 650], [960, 360], [1170, 215], [1345, 400], [1310, 650], [1740, 650]]
+        }
+      ],
+      "pads": [[330, 360], [720, 440], [720, 600], [250, 530], [1150, 500], [1130, 370], [1460, 520], [860, 240]],
+      "waves": [
+        { "groups": [{ "enemy": "kobold", "count": 8, "interval": 1.2 }] },
+        { "groups": [{ "enemy": "kobold", "count": 10, "interval": 1.0 }, { "enemy": "brute", "count": 2, "interval": 3, "delay": 6 }] },
+        { "groups": [{ "enemy": "brute", "count": 5, "interval": 2.2 }, { "enemy": "kobold", "count": 10, "interval": 0.8, "delay": 4 }] },
+        { "groups": [{ "enemy": "kobold", "count": 18, "interval": 0.6 }, { "enemy": "brute", "count": 4, "interval": 2.5, "delay": 8 }] },
+        { "groups": [{ "enemy": "brute", "count": 8, "interval": 1.8 }, { "enemy": "kobold", "count": 14, "interval": 0.7, "delay": 3 }] },
+        { "groups": [{ "enemy": "troll", "count": 1, "interval": 1 }, { "enemy": "brute", "count": 8, "interval": 1.6, "delay": 4 }, { "enemy": "kobold", "count": 20, "interval": 0.5, "delay": 2 }] }
+      ]
+    }
+  ]
+}

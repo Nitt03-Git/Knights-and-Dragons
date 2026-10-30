@@ -1,0 +1,88 @@
+{
+  "rules": {
+    "startGold": 240,
+    "lives": 20,
+    "sellRefund": 0.7,
+    "waveGap": 25,
+    "earlyBonusPerSecond": 1,
+    "starLives": [
+      18,
+      10
+    ],
+    "laneOffsets": [
+      -20,
+      0,
+      20
+    ],
+    "laneJitter": 4
+  },
+  "towers": {
+    "archer": {
+      "name": "Bowmen Tower",
+      "levels": [
+        {
+          "cost": 70,
+          "range": 230,
+          "cooldown": 0.7,
+          "damage": [
+            6,
+            10
+          ],
+          "damageType": "physical"
+        },
+        {
+          "cost": 110,
+          "range": 245,
+          "cooldown": 0.6,
+          "damage": [
+            10,
+            15
+          ],
+          "damageType": "physical"
+        },
+        {
+          "cost": 160,
+          "range": 260,
+          "cooldown": 0.5,
+          "damage": [
+            14,
+            20
+          ],
+          "damageType": "physical"
+        }
+      ]
+    }
+  },
+  "enemies": {
+    "kobold": {
+      "name": "Kobold Runner",
+      "hp": 45,
+      "speed": 70,
+      "armor": 0,
+      "magicResist": 0,
+      "bounty": 6,
+      "lifeCost": 1,
+      "size": 14
+    },
+    "brute": {
+      "name": "Scaled Brute",
+      "hp": 170,
+      "speed": 44,
+      "armor": 0.3,
+      "magicResist": 0,
+      "bounty": 16,
+      "lifeCost": 1,
+      "size": 19
+    },
+    "troll": {
+      "name": "Bridge Troll",
+      "hp": 750,
+      "speed": 30,
+      "armor": 0.2,
+      "magicResist": 0,
+      "bounty": 60,
+      "lifeCost": 3,
+      "size": 28
+    }
+  }
+}
