@@ -8,6 +8,12 @@ import type { Balance, DamageType, EnemySpec, Level, TowerLevel } from './types'
 export const WORLD_W = 1600;
 export const WORLD_H = 900;
 export const STEP = 1 / 60;
+/** Knights go after enemies this close to their flag. */
+export const ENGAGE_RANGE = 95;
+/** How close a tapped point must be to the road to move a flag there. */
+export const FLAG_SNAP = 70;
+/** Where the knights of a hall stand across the road, around the flag. */
+const POSTS: [number, number][] = [[0, -22], [-14, 0], [0, 22]];
 
 export type Phase = 'ready' | 'playing' | 'won' | 'lost';
 
@@ -22,8 +28,35 @@ export interface Enemy {
   x: number;
   y: number;
   alive: boolean;
+  /** The knight holding this enemy in place, if any. */
+  heldBy: number | null;
+  attackCooldown: number;
   /** Seconds since the last hit, for a short flash. */
   hitAge: number;
+}
+
+export type KnightState = 'idle' | 'walking' | 'fighting' | 'dead';
+
+export interface Knight {
+  id: number;
+  /** Pad of the hall it belongs to. */
+  pad: number;
+  slot: number;
+  x: number;
+  y: number;
+  hp: number;
+  state: KnightState;
+  target: number | null;
+  cooldown: number;
+  respawnIn: number;
+  hitAge: number;
+}
+
+export interface Rally {
+  path: number;
+  d: number;
+  x: number;
+  y: number;
 }
 
 export interface Tower {
@@ -34,6 +67,9 @@ export interface Tower {
   spent: number;
   /** Seconds since the last shot, for a small recoil. */
   shotAge: number;
+  /** Halls only: where the knights stand, and the knights. */
+  rally: Rally | null;
+  knights: Knight[];
 }
 
 export interface Projectile {
@@ -62,8 +98,8 @@ interface Spawner {
 }
 
 /** Damage after armor (physical) or magic resistance (magic). */
-export function damageAfterDefence(amount: number, type: DamageType, spec: EnemySpec): number {
-  const block = type === 'physical' ? spec.armor : spec.magicResist;
+export function damageAfterDefence(amount: number, type: DamageType, spec: { armor: number; magicResist?: number }): number {
+  const block = type === 'physical' ? spec.armor : (spec.magicResist ?? 0);
   return amount * (1 - block);
 }
 
@@ -90,6 +126,8 @@ export class Game {
   private spawners: Spawner[] = [];
   private nextId = 1;
   private rng: () => number;
+  private enemyById = new Map<number, Enemy>();
+  private knightById = new Map<number, Knight>();
 
   constructor(readonly level: Level, readonly balance: Balance, seed = 1) {
     this.paths = level.paths.map((p) => buildPath(p.points));
@@ -135,7 +173,15 @@ export class Game {
     const spec = this.towerLevel(type, 0);
     if (!spec || this.towers[pad] || this.gold < spec.cost || this.isOver()) return false;
     this.gold -= spec.cost;
-    this.towers[pad] = { pad, type, level: 0, cooldown: 0.3, spent: spec.cost, shotAge: 9 };
+    const tower: Tower = { pad, type, level: 0, cooldown: 0.3, spent: spec.cost, shotAge: 9, rally: null, knights: [] };
+    if (spec.unit) {
+      const p = this.pads[pad];
+      tower.rally = this.nearestRoad((s) => Math.hypot(s.x - p.x, s.y - p.y));
+      for (let slot = 0; slot < spec.unit.count; slot++) {
+        tower.knights.push({ id: this.nextId++, pad, slot, x: p.x, y: p.y, hp: spec.unit.hp, state: 'walking', target: null, cooldown: 0, respawnIn: 0, hitAge: 9 });
+      }
+    }
+    this.towers[pad] = tower;
     return true;
   }
 
@@ -152,6 +198,9 @@ export class Game {
     this.gold -= cost;
     t.level++;
     t.spent += cost;
+    // Upgraded knights come back to full (new) health.
+    const unit = this.towerLevel(t.type, t.level)?.unit;
+    if (unit) for (const k of t.knights) if (k.state !== 'dead') k.hp = unit.hp;
     return true;
   }
 
@@ -167,6 +216,19 @@ export class Game {
     return true;
   }
 
+  /** Moves a hall's flag to the road near (x, y). False if that isn't on the road within the hall's reach. */
+  setRally(pad: number, x: number, y: number): boolean {
+    const t = this.towers[pad];
+    const spec = t && this.towerLevel(t.type, t.level);
+    if (!t || !spec?.unit) return false;
+    const p = this.pads[pad];
+    const rally = this.nearestRoad((s) => (Math.hypot(s.x - p.x, s.y - p.y) <= spec.range ? Math.hypot(s.x - x, s.y - y) : Infinity));
+    if (!rally || Math.hypot(rally.x - x, rally.y - y) > FLAG_SNAP) return false;
+    t.rally = rally;
+    for (const k of t.knights) k.target = null;
+    return true;
+  }
+
   isOver(): boolean {
     return this.phase === 'won' || this.phase === 'lost';
   }
@@ -178,11 +240,23 @@ export class Game {
     return this.lives >= three ? 3 : this.lives >= two ? 2 : 1;
   }
 
+  /** Where a knight of this hall stands when it isn't fighting. */
+  knightPost(t: Tower, slot: number): { x: number; y: number } {
+    const r = t.rally!;
+    const [along, side] = POSTS[slot % POSTS.length];
+    return pointAt(this.paths[r.path], r.d + along, side);
+  }
+
   // ---- Simulation ----
 
   step(dt = STEP): void {
     if (this.isOver()) return;
     this.time += dt;
+    this.enemyById.clear();
+    for (const e of this.enemies) this.enemyById.set(e.id, e);
+    this.knightById.clear();
+    for (const t of this.towers) if (t) for (const k of t.knights) this.knightById.set(k.id, k);
+
     this.updateWaves(dt);
     this.updateEnemies(dt);
     this.updateTowers(dt);
@@ -229,13 +303,30 @@ export class Game {
     const lanes = this.rules.laneOffsets;
     const lane = lanes[Math.floor(this.rng() * lanes.length)] + (this.rng() * 2 - 1) * this.rules.laneJitter;
     const p = pointAt(this.paths[path], 0, lane);
-    this.enemies.push({ id: this.nextId++, type, spec, hp: spec.hp, path, d: 0, lane, x: p.x, y: p.y, alive: true, hitAge: 9 });
+    const e: Enemy = { id: this.nextId++, type, spec, hp: spec.hp, path, d: 0, lane, x: p.x, y: p.y, alive: true, heldBy: null, attackCooldown: spec.attackCooldown / 2, hitAge: 9 };
+    this.enemies.push(e);
+    this.enemyById.set(e.id, e);
   }
 
   private updateEnemies(dt: number): void {
     for (const e of this.enemies) {
       if (!e.alive) continue;
       e.hitAge += dt;
+
+      // Held by a knight: stand still and fight back once the knight has arrived.
+      if (e.heldBy !== null) {
+        const k = this.knightById.get(e.heldBy);
+        if (!k || k.state === 'dead' || k.target !== e.id) e.heldBy = null;
+        else {
+          e.attackCooldown -= dt;
+          if (k.state === 'fighting' && e.attackCooldown <= 0) {
+            this.hitKnight(k, e.spec.attack);
+            e.attackCooldown = e.spec.attackCooldown;
+          }
+          continue;
+        }
+      }
+
       e.d += e.spec.speed * dt;
       const path = this.paths[e.path];
       if (e.d >= path.length) {
@@ -253,17 +344,20 @@ export class Game {
   private updateTowers(dt: number): void {
     for (const t of this.towers) {
       if (!t) continue;
+      const spec = this.towerLevel(t.type, t.level)!;
+      if (spec.unit) {
+        this.updateHall(t, spec, dt);
+        continue;
+      }
       t.shotAge += dt;
       t.cooldown -= dt;
       if (t.cooldown > 0) continue;
-      const spec = this.towerLevel(t.type, t.level)!;
       const pad = this.pads[t.pad];
       const target = this.pickTarget(pad.x, pad.y, spec.range);
       if (!target) {
         t.cooldown = 0;
         continue;
       }
-      const [lo, hi] = spec.damage;
       this.projectiles.push({
         x: pad.x,
         y: pad.y - 50,
@@ -271,13 +365,119 @@ export class Game {
         tx: target.x,
         ty: target.y,
         speed: 900,
-        damage: lo + this.rng() * (hi - lo),
+        damage: this.roll(spec.damage),
         damageType: spec.damageType,
         done: false,
       });
       t.cooldown = spec.cooldown;
       t.shotAge = 0;
     }
+  }
+
+  private updateHall(t: Tower, spec: TowerLevel, dt: number): void {
+    const unit = spec.unit!;
+    const pad = this.pads[t.pad];
+    for (const k of t.knights) {
+      k.hitAge += dt;
+      if (k.state === 'dead') {
+        k.respawnIn -= dt;
+        if (k.respawnIn <= 0) Object.assign(k, { state: 'walking', hp: unit.hp, x: pad.x, y: pad.y, target: null });
+        continue;
+      }
+
+      let target = k.target === null ? undefined : this.enemyById.get(k.target);
+      if (!target?.alive) {
+        k.target = null;
+        target = this.findFoe(t);
+        if (target) k.target = target.id;
+      }
+      if (target && target.heldBy === null) target.heldBy = k.id;
+
+      if (target) {
+        const reach = target.spec.size + 14;
+        const dist = Math.hypot(k.x - target.x, k.y - target.y);
+        if (dist > reach + 1) {
+          k.state = 'walking';
+          this.walk(k, target.x, target.y, Math.min(unit.speed * dt, dist - reach));
+        } else {
+          k.state = 'fighting';
+          k.cooldown -= dt;
+          if (k.cooldown <= 0) {
+            this.hit(target, this.roll(spec.damage), spec.damageType);
+            k.cooldown = spec.cooldown;
+          }
+        }
+      } else {
+        const post = this.knightPost(t, k.slot);
+        const dist = Math.hypot(post.x - k.x, post.y - k.y);
+        if (dist < 1) {
+          k.state = 'idle';
+          k.hp = Math.min(unit.hp, k.hp + unit.regen * dt);
+        } else {
+          k.state = 'walking';
+          this.walk(k, post.x, post.y, Math.min(unit.speed * dt, dist));
+        }
+      }
+    }
+  }
+
+  /** A foe for a knight: free enemies near the flag first, then help a fellow knight. */
+  private findFoe(t: Tower): Enemy | undefined {
+    const r = t.rally!;
+    let best: Enemy | undefined;
+    let bestScore = Infinity;
+    for (const e of this.enemies) {
+      if (!e.alive || e.spec.flying || Math.hypot(e.x - r.x, e.y - r.y) > ENGAGE_RANGE) continue;
+      const score = (e.heldBy === null ? 0 : 1e6) + (this.paths[e.path].length - e.d);
+      if (score < bestScore) {
+        best = e;
+        bestScore = score;
+      }
+    }
+    return best;
+  }
+
+  private walk(k: Knight, x: number, y: number, step: number): void {
+    const dx = x - k.x;
+    const dy = y - k.y;
+    const len = Math.hypot(dx, dy) || 1;
+    k.x += (dx / len) * step;
+    k.y += (dy / len) * step;
+  }
+
+  private hitKnight(k: Knight, [lo, hi]: [number, number]): void {
+    const t = this.towers[k.pad];
+    const unit = t && this.towerLevel(t.type, t.level)?.unit;
+    if (!unit) return;
+    k.hp -= damageAfterDefence(lo + this.rng() * (hi - lo), 'physical', unit);
+    k.hitAge = 0;
+    if (k.hp <= 0) {
+      k.state = 'dead';
+      k.respawnIn = unit.respawn;
+      k.target = null;
+    }
+  }
+
+  /** Nearest road point by `score` (lower is better), or null if every score is Infinity. */
+  private nearestRoad(score: (s: { x: number; y: number }) => number): Rally | null {
+    let best: Rally | null = null;
+    let bestScore = Infinity;
+    this.paths.forEach((path, pi) => {
+      for (const s of path.samples) {
+        // Stay off the parts of the road that run outside the map.
+        if (s.x < 30 || s.x > WORLD_W - 30 || s.y < 30 || s.y > WORLD_H - 30) continue;
+        const v = score(s);
+        if (v < bestScore) {
+          bestScore = v;
+          best = { path: pi, d: s.d, x: s.x, y: s.y };
+        }
+      }
+    });
+    return best;
+  }
+
+  private roll([lo, hi]: [number, number]): number {
+    return lo + this.rng() * (hi - lo);
   }
 
   /** The enemy in range that is furthest along its road. */
@@ -297,8 +497,8 @@ export class Game {
 
   private updateProjectiles(dt: number): void {
     for (const p of this.projectiles) {
-      const target = this.enemies.find((e) => e.id === p.target && e.alive);
-      if (target) {
+      const target = this.enemyById.get(p.target);
+      if (target?.alive) {
         p.tx = target.x;
         p.ty = target.y - target.spec.size;
       }
@@ -308,7 +508,7 @@ export class Game {
       const move = p.speed * dt;
       if (dist <= move) {
         p.done = true;
-        if (target) this.hit(target, p.damage, p.damageType);
+        if (target?.alive) this.hit(target, p.damage, p.damageType);
       } else {
         p.x += (dx / dist) * move;
         p.y += (dy / dist) * move;

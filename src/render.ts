@@ -1,7 +1,7 @@
 // Draws the game with simple shapes. Phase 2 replaces these draw functions with real art;
 // nothing in here changes the game.
 import { makeRng } from './rng';
-import { WORLD_H, WORLD_W, type Enemy, type Game, type Tower } from './sim';
+import { WORLD_H, WORLD_W, type Enemy, type Game, type Knight, type Tower } from './sim';
 
 export interface View {
   /** CSS pixels per world unit, and where the world's top-left corner sits on screen. */
@@ -41,6 +41,10 @@ const C = {
   stone: '#c9c2b4',
   stoneDark: '#9d9585',
   archerRoof: '#2f7d4f',
+  hallRoof: '#2f5d9a',
+  steel: '#d4d9e0',
+  steelDark: '#8d96a3',
+  tabard: '#2f5d9a',
   hpBack: 'rgba(0,0,0,0.55)',
   hp: '#7ed957',
   hpLow: '#f05a3c',
@@ -76,7 +80,7 @@ export class Renderer {
     this.scenery = makeScenery(game);
   }
 
-  draw(game: Game, v: View, dt: number, selectedPad: number | null): void {
+  draw(game: Game, v: View, dt: number, selectedPad: number | null, placingFlag = false): void {
     const ctx = this.ctx;
     ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
     // Grass fills the whole screen, also beyond the map on screens wider or taller than 16:9.
@@ -96,17 +100,22 @@ export class Renderer {
       if (t) {
         const spec = game.towerLevel(t.type, t.level)!;
         const p = game.pads[selectedPad];
+        // Bowmen: how far they shoot. Halls: how far the flag may go (blue).
+        const tint = spec.unit ? '170, 205, 255' : '255, 245, 200';
         ctx.beginPath();
         ctx.arc(p.x, p.y, spec.range, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 245, 200, 0.12)';
+        ctx.fillStyle = `rgba(${tint}, ${placingFlag ? 0.2 : 0.12})`;
         ctx.fill();
         ctx.lineWidth = 3;
-        ctx.strokeStyle = 'rgba(255, 245, 200, 0.6)';
+        ctx.strokeStyle = `rgba(${tint}, 0.7)`;
         ctx.setLineDash([12, 10]);
         ctx.stroke();
         ctx.setLineDash([]);
       }
     }
+    game.towers.forEach((t, i) => {
+      if (t?.rally) drawFlag(ctx, t.rally.x, t.rally.y, i === selectedPad);
+    });
 
     // Everything that stands up is drawn back-to-front so lower things overlap higher ones.
     type Item = { y: number; draw: () => void };
@@ -116,6 +125,10 @@ export class Renderer {
       if (t) items.push({ y: game.pads[t.pad].y, draw: () => drawTower(ctx, game, t) });
     });
     for (const e of game.enemies) items.push({ y: e.y, draw: () => drawEnemy(ctx, e, game.paths[e.path].length) });
+    game.towers.forEach((t) => {
+      const unit = t && game.towerLevel(t.type, t.level)?.unit;
+      if (t && unit) for (const k of t.knights) if (k.state !== 'dead') items.push({ y: k.y, draw: () => drawKnight(ctx, k, unit.hp, game.time) });
+    });
     items.sort((a, b) => a.y - b.y);
     for (const it of items) it.draw();
 
@@ -294,6 +307,7 @@ function drawPad(ctx: CanvasRenderingContext2D, x: number, y: number, selected: 
 }
 
 function drawTower(ctx: CanvasRenderingContext2D, game: Game, t: Tower): void {
+  if (t.type === 'knights') return drawHall(ctx, game, t);
   const { x, y } = game.pads[t.pad];
   shadow(ctx, x, y + 4, 40);
   const recoil = t.shotAge < 0.1 ? 2 : 0;
@@ -323,13 +337,131 @@ function drawTower(ctx: CanvasRenderingContext2D, game: Game, t: Tower): void {
   ctx.lineTo(x + w / 2 + 10, top - 8);
   ctx.closePath();
   ctx.fill();
-  // Level pips
+  levelPips(ctx, x, y - 14, t.level);
+}
+
+function levelPips(ctx: CanvasRenderingContext2D, x: number, y: number, level: number): void {
   ctx.fillStyle = C.gold;
-  for (let i = 0; i <= t.level; i++) {
+  for (let i = 0; i <= level; i++) {
     ctx.beginPath();
-    ctx.arc(x - (t.level * 8) / 2 + i * 8, y - 14, 3, 0, Math.PI * 2);
+    ctx.arc(x - (level * 8) / 2 + i * 8, y, 3, 0, Math.PI * 2);
     ctx.fill();
   }
+}
+
+function drawHall(ctx: CanvasRenderingContext2D, game: Game, t: Tower): void {
+  const { x, y } = game.pads[t.pad];
+  shadow(ctx, x, y + 4, 44);
+  const w = 70;
+  const h = 34 + t.level * 5;
+  ctx.fillStyle = C.stoneDark;
+  ctx.fillRect(x - w / 2, y - h, w, h);
+  ctx.fillStyle = C.stone;
+  ctx.fillRect(x - w / 2 + 4, y - h, w - 12, h);
+  // Door
+  ctx.fillStyle = '#5b3a1e';
+  ctx.beginPath();
+  ctx.moveTo(x - 9, y);
+  ctx.lineTo(x - 9, y - 16);
+  ctx.arc(x, y - 16, 9, Math.PI, 0);
+  ctx.lineTo(x + 9, y);
+  ctx.fill();
+  // Roof
+  ctx.fillStyle = C.hallRoof;
+  ctx.beginPath();
+  ctx.moveTo(x - w / 2 - 8, y - h);
+  ctx.lineTo(x - w / 2 + 12, y - h - 30);
+  ctx.lineTo(x + w / 2 - 12, y - h - 30);
+  ctx.lineTo(x + w / 2 + 8, y - h);
+  ctx.closePath();
+  ctx.fill();
+  // Banner pole on the roof
+  ctx.fillStyle = '#5b3a1e';
+  ctx.fillRect(x + 18, y - h - 58, 3, 30);
+  ctx.fillStyle = C.gold;
+  ctx.beginPath();
+  ctx.moveTo(x + 21, y - h - 58);
+  ctx.lineTo(x + 40, y - h - 52);
+  ctx.lineTo(x + 21, y - h - 46);
+  ctx.fill();
+  levelPips(ctx, x, y - h - 12, t.level);
+}
+
+function drawFlag(ctx: CanvasRenderingContext2D, x: number, y: number, big: boolean): void {
+  const s = big ? 1.3 : 0.85;
+  ctx.fillStyle = 'rgba(20, 30, 10, 0.3)';
+  ctx.beginPath();
+  ctx.ellipse(x, y, 8 * s, 3.5 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#5b3a1e';
+  ctx.fillRect(x - 1.5 * s, y - 34 * s, 3 * s, 34 * s);
+  ctx.fillStyle = C.tabard;
+  ctx.beginPath();
+  ctx.moveTo(x + 1.5 * s, y - 34 * s);
+  ctx.lineTo(x + 22 * s, y - 28 * s);
+  ctx.lineTo(x + 1.5 * s, y - 20 * s);
+  ctx.fill();
+}
+
+function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: number, time: number): void {
+  // Drawn at 10 units and scaled up around the feet.
+  ctx.save();
+  ctx.translate(k.x, k.y);
+  ctx.scale(1.4, 1.4);
+  ctx.translate(-k.x, -k.y);
+  const r = 10;
+  const bob = k.state === 'walking' ? Math.abs(Math.sin(time * 12 + k.id)) * 2.5 : 0;
+  shadow(ctx, k.x, k.y, r);
+  const cy = k.y - r - 2 - bob;
+  // Body with blue tabard
+  ctx.fillStyle = k.hitAge < 0.08 ? '#ffffff' : C.steel;
+  ctx.beginPath();
+  ctx.arc(k.x, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = C.tabard;
+  ctx.fillRect(k.x - 5, cy - 2, 10, 10);
+  // Helmet visor
+  ctx.strokeStyle = C.steelDark;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(k.x - 5, cy - 5);
+  ctx.lineTo(k.x + 5, cy - 5);
+  ctx.stroke();
+  // Sword: swings while fighting
+  const swing = k.state === 'fighting' ? Math.sin(time * 10 + k.id) * 0.9 : 0.3;
+  ctx.save();
+  ctx.translate(k.x + 8, cy);
+  ctx.rotate(-1.2 + swing);
+  ctx.strokeStyle = '#eef2f6';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, -16);
+  ctx.stroke();
+  ctx.restore();
+  // Shield
+  ctx.fillStyle = C.tabard;
+  ctx.strokeStyle = C.gold;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(k.x - 13, cy - 5);
+  ctx.lineTo(k.x - 5, cy - 5);
+  ctx.lineTo(k.x - 5, cy + 3);
+  ctx.lineTo(k.x - 9, cy + 7);
+  ctx.lineTo(k.x - 13, cy + 3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  if (k.hp < maxHp) {
+    const w = 24;
+    const f = Math.max(0, k.hp / maxHp);
+    const by = cy - r - 10;
+    ctx.fillStyle = C.hpBack;
+    ctx.fillRect(k.x - w / 2 - 1, by - 1, w + 2, 6);
+    ctx.fillStyle = f > 0.35 ? '#6fb8ff' : C.hpLow;
+    ctx.fillRect(k.x - w / 2, by, w * f, 4);
+  }
+  ctx.restore();
 }
 
 function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, roadLength: number): void {

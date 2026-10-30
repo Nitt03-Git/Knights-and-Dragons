@@ -8,12 +8,12 @@ import { BALANCE, LEVELS } from './data';
 import { fitView, Renderer, toScreen, toWorld, type View } from './render';
 import { Game, STEP } from './sim';
 
-const VERSION = '0.2';
+const VERSION = '0.3';
 
 /** Towers in the build ring, clockwise from top-left. Locked ones arrive in later versions. */
 const BUILD_RING: { type: string; icon: string; label: string; angle: number; soon?: string }[] = [
   { type: 'archer', icon: '🏹', label: 'Bowmen', angle: -135 },
-  { type: 'knights', icon: '🛡️', label: 'Knights', angle: -45, soon: '0.3' },
+  { type: 'knights', icon: '🛡️', label: 'Knights', angle: -45 },
   { type: 'catapult', icon: '🪨', label: 'Catapult', angle: 45, soon: '0.4' },
   { type: 'wizard', icon: '🔮', label: 'Wizard', angle: 135, soon: '0.4' },
 ];
@@ -42,6 +42,8 @@ let view: View = fitView(1, 1, 1);
 let speed = 1;
 let paused = true;
 let selected: number | null = null;
+/** Pad of the hall whose flag the player is moving, if any. */
+let placingFlag: number | null = null;
 let shownEnd = false;
 let bannerTimer = 0;
 
@@ -82,7 +84,7 @@ function showStart(): void {
   showCard(
     `<h1>Knights &amp; Dragons</h1>
      <p>The dragon's horde is coming down <b>${level.name}</b>.</p>
-     <p>Tap a stone spot to build a tower. Tap <b>⚔ Start</b> when you're ready.</p>`,
+     <p>Tap a stone spot to build. Bowmen shoot; knights hold the road. Tap <b>⚔ Start</b> when you're ready.</p>`,
     [{ text: 'Play', main: true, onClick: () => { goFullscreen(); hideCard(); paused = false; } }],
   );
 }
@@ -128,10 +130,15 @@ function goFullscreen(): void {
   }
 }
 
-function showBanner(html: string): void {
+function showBanner(html: string, seconds = 2): void {
   ui.banner.innerHTML = html;
   ui.banner.hidden = false;
-  bannerTimer = 2;
+  bannerTimer = seconds;
+}
+
+function hideBanner(): void {
+  ui.banner.hidden = true;
+  bannerTimer = 0;
 }
 
 // ---- Build / upgrade ring ----
@@ -143,6 +150,8 @@ interface RingButton {
 let ring: RingButton[] = [];
 
 function closeMenu(): void {
+  if (placingFlag !== null) hideBanner();
+  placingFlag = null;
   selected = null;
   ui.menu.hidden = true;
   ui.menu.innerHTML = '';
@@ -200,10 +209,30 @@ function openMenu(pad: number): void {
         el.classList.toggle('cant', cost !== null && game.gold < cost);
       },
     );
+    if (tower.rally) {
+      ringButton(180, '<span class="icon">🚩</span><span class="label">Move</span><span class="label">flag</span>', () => startFlag(pad));
+    }
     ringButton(90, `<span class="icon">💰</span><span class="label">Sell</span><span class="price">+${game.sellValue(pad)}</span>`, () => game.sell(pad) && closeMenu(), (el) => el.classList.add('sell'));
   }
   ui.menu.hidden = false;
   for (const b of ring) b.update();
+}
+
+function startFlag(pad: number): void {
+  closeMenu();
+  selected = pad;
+  placingFlag = pad;
+  showBanner('Tap the road<small>inside the blue circle</small>', Infinity);
+}
+
+/** A tap while moving a flag: on the road moves it; far outside the circle cancels. */
+function placeFlag(x: number, y: number): void {
+  const pad = placingFlag!;
+  const t = game.towers[pad];
+  const range = t ? game.towerLevel(t.type, t.level)!.range : 0;
+  const p = game.pads[pad];
+  if (game.setRally(pad, x, y) || Math.hypot(x - p.x, y - p.y) > range + 60) closeMenu();
+  else showBanner('Tap the road<small>inside the blue circle</small>', Infinity);
 }
 
 // ---- Input ----
@@ -215,6 +244,7 @@ canvas.addEventListener('pointerup', (e) => {
   down = null;
   if (paused || game.isOver()) return;
   const w = toWorld(view, e.clientX, e.clientY);
+  if (placingFlag !== null) return placeFlag(w.x, w.y);
   // Generous hit area: at least 24 screen pixels, even on a small screen.
   const reach = Math.max(55, 24 / view.scale);
   let best = -1;
@@ -279,7 +309,7 @@ function frame(now: number): void {
       showBanner(`Wave ${ev.wave} of ${game.totalWaves}${ev.bonus ? `<small>+${ev.bonus} gold for calling early</small>` : ''}`);
     }
   }
-  renderer.draw(game, view, paused ? 0 : dt * speed, selected);
+  renderer.draw(game, view, paused ? 0 : dt * speed, selected, placingFlag !== null);
   game.events.length = 0;
   if (bannerTimer > 0 && (bannerTimer -= dt) <= 0) ui.banner.hidden = true;
   updateHud();

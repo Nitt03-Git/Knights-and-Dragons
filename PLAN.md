@@ -38,8 +38,9 @@ Other games in the genre are a reference for *feel* only.
    physical, but armor counts for half against it.
 4. **Towers shoot the enemy in range that is furthest along its road.** (Target choices may
    come later.)
-5. **Blocking:** each knight holds one enemy; enemies that aren't held walk past. Flying
-   enemies can't be held.
+5. **Blocking:** knights go for enemies within 95 units of their flag. Each knight holds one
+   enemy (it stops and fights back); spare knights help a fellow knight; enemies that aren't
+   held walk past. Flying enemies can't be held. Towers keep shooting held enemies.
 6. **Roads:** a level has one or more roads, drawn as a few control points, smoothed by
    corner-cutting (Chaikin) and resampled evenly. Each road has 3 side-by-side lanes so
    enemies spread out.
@@ -55,7 +56,7 @@ Other games in the genre are a reference for *feel* only.
 | Tower | Role | Status |
 |---|---|---|
 | Bowmen Tower | fast single shots, physical | ✅ 0.2 |
-| Knights' Hall | 3 knights at a movable rally flag, block and fight | 0.3 |
+| Knights' Hall | 3 knights at a movable flag on the road, hold and fight | ✅ 0.3 |
 | Wizard Tower | slow, strong magic bolts | 0.4 |
 | Catapult | very slow, splash, physical (half armor) | 0.4 |
 
@@ -75,8 +76,10 @@ Each one is a version the owner can play from the link.
 - **0.2 ✅**: one road with lanes, waves from the level file, lives, gold, Bowmen Tower with
   3 levels, selling, calling waves early, win/lose with stars, pause, 2× speed, full-screen
   landscape. Level 1 "Greenhollow Road" balanced with the bot (`test/balance.test.ts`).
-- **0.3**: Knights' Hall: knights walk to a rally flag on the road, hold enemies, fight,
-  respawn. Move the flag by tapping the road.
+- **0.3 ✅**: Knights' Hall (3 levels): 3 knights stand at a flag on the road, each holds one
+  enemy and fights it, fallen knights return after a few seconds, idle knights heal. Move the
+  flag with the 🚩 button, then tap the road inside the blue circle. Build spots moved after
+  the owner's first play (3 of them reached almost no road); enemies a bit tougher to match.
 - **0.4**: Wizard Tower and Catapult; Hexling and Wyrmling.
 - **0.5**: level select with 3 levels; stars saved on the phone.
 - **0.6**: Level Studio: draw a road with a finger, place build spots, set waves, then

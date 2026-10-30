@@ -20,7 +20,10 @@ If it still shows an older build, wait a few minutes: GitHub Pages caches the pa
 
 ## How to play
 
-- Tap a grey stone spot to build a tower. Tap a tower to upgrade or sell it.
+- Tap a grey stone spot to build. **Bowmen** shoot arrows; a **Knights' Hall** sends three
+  knights onto the road to stop enemies. Tap a building to upgrade or sell it.
+- To move the knights, tap their hall, then **🚩 Move flag**, then tap the road inside the
+  blue circle.
 - Tap **⚔ Start wave 1** when you're ready. Later waves start by themselves; calling them
   early gives bonus gold.
 - Each enemy that reaches the end of the road costs lives. Win with 18+ lives left for 3 stars.

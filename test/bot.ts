@@ -4,21 +4,24 @@ import type { Level } from '../src/types';
 
 export { BALANCE, LEVELS } from '../src/data';
 
+/** What the bot builds: [pad, tower type], in order of priority. */
+export type BuildPlan = [number, string][];
+
 /**
- * A simple player: before each wave it builds on `pads` (in that order) and then upgrades.
- * It never calls waves early. Used to check that levels are winnable but not free.
+ * A simple player: whenever it has gold it builds the plan in order (up to `maxTowers`),
+ * then upgrades. It never calls waves early. Used to check that levels are winnable but not free.
  */
-export function playBot(level: Level, pads: number[], seed = 1, maxTowers = pads.length): Game {
+export function playBot(level: Level, plan: BuildPlan, seed = 1, maxTowers = plan.length): Game {
   const g = new Game(level, BALANCE, seed);
   const spend = () => {
     let built = g.towers.filter(Boolean).length;
-    for (const p of pads) {
+    for (const [pad, type] of plan) {
       if (built >= maxTowers) break;
-      if (!g.towers[p] && g.build(p, 'archer')) built++;
+      if (!g.towers[pad] && g.build(pad, type)) built++;
     }
     for (let changed = true; changed; ) {
       changed = false;
-      for (const p of pads) if (g.towers[p] && g.upgrade(p)) changed = true;
+      for (const [pad] of plan) if (g.towers[pad] && g.upgrade(pad)) changed = true;
     }
   };
   let guard = 0;

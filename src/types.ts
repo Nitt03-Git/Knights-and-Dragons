@@ -21,10 +21,26 @@ export interface Rules {
 
 export interface TowerLevel {
   cost: number;
+  /** Shooting range, or for a hall: how far from the hall its flag may stand. */
   range: number;
+  /** Seconds between shots (or a unit's sword blows). */
   cooldown: number;
   damage: [number, number];
   damageType: DamageType;
+  /** Present on halls: the units they send to the road. */
+  unit?: UnitStats;
+}
+
+export interface UnitStats {
+  count: number;
+  hp: number;
+  /** 0..1, share of physical damage blocked. */
+  armor: number;
+  /** Seconds before a fallen unit returns. */
+  respawn: number;
+  /** Health per second regained while not fighting. */
+  regen: number;
+  speed: number;
 }
 
 export interface TowerSpec {
@@ -43,6 +59,11 @@ export interface EnemySpec {
   bounty: number;
   lifeCost: number;
   size: number;
+  /** Melee blows against a knight holding it. */
+  attack: [number, number];
+  attackCooldown: number;
+  /** Flying enemies can't be held by knights. */
+  flying?: boolean;
 }
 
 export interface Balance {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildPath, distanceToPath, pointAt } from '../src/path';
-import { damageAfterDefence, Game, WORLD_H, WORLD_W } from '../src/sim';
+import { damageAfterDefence, Game, WORLD_H, WORLD_W, type Tower } from '../src/sim';
 import { BALANCE, LEVELS } from './bot';
 
 describe('road', () => {
@@ -40,6 +40,17 @@ describe('levels', () => {
       }
     });
 
+    it(`${level.id}: every pad can put knights on the road`, () => {
+      const g = new Game(level, BALANCE);
+      g.gold = 1e6;
+      g.pads.forEach((_, i) => {
+        expect(g.build(i, 'knights')).toBe(true);
+        const p = g.pads[i];
+        const r = g.towers[i]!.rally!;
+        expect(Math.hypot(r.x - p.x, r.y - p.y)).toBeLessThanOrEqual(BALANCE.towers.knights.levels[0].range);
+      });
+    });
+
     it(`${level.id}: only uses known enemies`, () => {
       for (const w of level.waves) for (const gr of w.groups) expect(BALANCE.enemies[gr.enemy]).toBeDefined();
     });
@@ -74,5 +85,56 @@ describe('game rules', () => {
     g.build(0, 'archer');
     const cost = BALANCE.towers.archer.levels[0].cost;
     expect(g.sellValue(0)).toBe(Math.floor(cost * BALANCE.rules.sellRefund));
+  });
+});
+
+describe('knights', () => {
+  const level = LEVELS[0];
+  const hall = (g: Game): Tower => g.towers.find((t) => t?.type === 'knights')!;
+
+  function gameWithHall(): Game {
+    const g = new Game(level, BALANCE);
+    g.build(0, 'knights');
+    g.callWave();
+    return g;
+  }
+
+  it('hold an enemy in place until it falls', () => {
+    const g = gameWithHall();
+    let held = undefined;
+    for (let i = 0; i < 60 * 60 && !held; i++) {
+      g.step();
+      held = g.enemies.find((e) => e.heldBy !== null);
+    }
+    expect(held).toBeDefined();
+    const d = held!.d;
+    for (let i = 0; i < 30 && held!.alive; i++) g.step();
+    expect(held!.d).toBe(d);
+  });
+
+  it('come back after falling', () => {
+    const g = gameWithHall();
+    const k = hall(g).knights[0];
+    const state = () => k.state; // read fresh each time (the game changes it)
+    while (state() !== 'fighting') g.step();
+    k.hp = 0.01;
+    for (let i = 0; i < 60 * 10 && state() !== 'dead'; i++) g.step();
+    expect(state()).toBe('dead');
+    const respawn = BALANCE.towers.knights.levels[0].unit!.respawn;
+    for (let i = 0; i < 60 * (respawn + 0.5); i++) g.step();
+    expect(state()).not.toBe('dead');
+  });
+
+  it('move their flag only to the road within reach', () => {
+    const g = new Game(level, BALANCE);
+    g.build(0, 'knights');
+    const t = hall(g);
+    const p = g.pads[0];
+    expect(g.setRally(0, p.x, p.y)).toBe(false); // the pad itself isn't road
+    expect(g.setRally(0, 1500, 650)).toBe(false); // road, but far away
+    const start = t.rally!;
+    const other = g.paths[0].samples.find((s) => Math.hypot(s.x - p.x, s.y - p.y) < 180 && Math.abs(s.d - start.d) > 100)!;
+    expect(g.setRally(0, other.x + 10, other.y)).toBe(true);
+    expect(t.rally!.d).not.toBe(start.d);
   });
 });
