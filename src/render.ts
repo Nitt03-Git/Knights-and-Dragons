@@ -1,7 +1,7 @@
 // Draws the game with simple shapes. Phase 2 replaces these draw functions with real art;
 // nothing in here changes the game.
 import { makeRng } from './rng';
-import { FLY_HEIGHT, WORLD_H, WORLD_W, type Enemy, type Game, type Knight, type Projectile, type Tower } from './sim';
+import { FLY_HEIGHT, WORLD_H, WORLD_W, type Enemy, type Game, type Hero, type Knight, type Projectile, type Tower } from './sim';
 
 export interface View {
   /** CSS pixels per world unit, and where the world's top-left corner sits on screen. */
@@ -49,6 +49,9 @@ export interface Overlay {
   preview: { pad: number; type: string; level: number } | null;
   /** A hall's flag being dragged: the finger, and where the flag would land (null: not allowed there). */
   drag: { pad: number; x: number; y: number; snap: { x: number; y: number } | null } | null;
+  /** The hero is selected (waiting for where to ride), or being dragged to (x, y). */
+  heroSelected: boolean;
+  heroDrag: { x: number; y: number } | null;
 }
 
 export function toWorld(v: View, sx: number, sy: number) {
@@ -105,6 +108,7 @@ interface Boom {
   y: number;
   radius: number;
   age: number;
+  stomp: boolean;
 }
 
 interface Scenery {
@@ -117,6 +121,9 @@ interface Scenery {
 export class Renderer {
   private floaters: Floater[] = [];
   private booms: Boom[] = [];
+  /** Which way the hero faces (1 right, -1 left), from how it last moved. */
+  private heroFacing = 1;
+  private heroLastX = 0;
   private scenery: Scenery[] = [];
 
   constructor(private ctx: CanvasRenderingContext2D, game: Game) {
@@ -165,6 +172,34 @@ export class Renderer {
       if (r) drawFlag(ctx, r.x, r.y, true, 0.6);
     }
 
+    const hero = game.hero;
+    if (hero.state !== 'dead') {
+      if (game.abilities.has('rally')) {
+        // Rallying Banner: knights inside this ring get the boost.
+        ctx.strokeStyle = 'rgba(255, 213, 74, 0.55)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 10]);
+        ctx.beginPath();
+        ctx.ellipse(hero.x, hero.y, game.balance.hero.rally.radius, game.balance.hero.rally.radius * 0.55, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (o.heroSelected || o.heroDrag) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.ellipse(hero.x, hero.y, 34, 15, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+    if (o.heroDrag) drawMarker(ctx, o.heroDrag.x, o.heroDrag.y);
+    else if (hero.dest) drawMarker(ctx, hero.dest.x, hero.dest.y);
+    if (Math.abs(hero.x - this.heroLastX) > 0.5) this.heroFacing = hero.x > this.heroLastX ? 1 : -1;
+    this.heroLastX = hero.x;
+    const facing = this.heroFacing;
+
     // Everything that stands up is drawn back-to-front so lower things overlap higher ones.
     type Item = { y: number; draw: () => void };
     const items: Item[] = [];
@@ -190,6 +225,7 @@ export class Renderer {
       const unit = t && game.towerLevel(t.type, t.level)?.unit;
       if (t && unit) for (const k of t.knights) if (k.state !== 'dead') items.push({ y: k.y, draw: () => drawKnight(ctx, k, unit.hp, game.time) });
     });
+    if (hero.state !== 'dead') items.push({ y: hero.y, draw: () => drawHero(ctx, hero, game.balance.hero.hp, game.time, facing) });
     items.sort((a, b) => a.y - b.y);
     for (const it of items) it.draw();
 
@@ -246,17 +282,18 @@ export class Renderer {
   }
 
   private drawBooms(game: Game, dt: number): void {
-    for (const ev of game.events) if (ev.kind === 'boom') this.booms.push({ x: ev.x, y: ev.y, radius: ev.radius, age: 0 });
+    for (const ev of game.events) if (ev.kind === 'boom') this.booms.push({ x: ev.x, y: ev.y, radius: ev.radius, age: 0, stomp: !!ev.stomp });
     const ctx = this.ctx;
     for (const b of this.booms) {
       b.age += dt;
       const f = Math.min(1, b.age / 0.45);
       ctx.globalAlpha = 1 - f;
-      ctx.fillStyle = 'rgba(120, 90, 50, 0.45)';
+      ctx.fillStyle = b.stomp ? 'rgba(255, 213, 74, 0.3)' : 'rgba(120, 90, 50, 0.45)';
       ctx.beginPath();
       ctx.ellipse(b.x, b.y, b.radius * (0.5 + f * 0.6), b.radius * (0.25 + f * 0.3), 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255, 220, 160, 0.9)';
+      ctx.lineWidth = b.stomp ? 5 : 3;
+      ctx.strokeStyle = b.stomp ? 'rgba(255, 213, 74, 0.95)' : 'rgba(255, 220, 160, 0.9)';
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.ellipse(b.x, b.y, b.radius * f, b.radius * f * 0.5, 0, 0, Math.PI * 2);
@@ -623,6 +660,135 @@ function drawFlag(ctx: CanvasRenderingContext2D, x: number, y: number, big: bool
   ctx.lineTo(x + 1.5 * s, y - 20 * s);
   ctx.fill();
   ctx.globalAlpha = 1;
+}
+
+function drawMarker(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  ctx.strokeStyle = 'rgba(255, 213, 74, 0.9)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.ellipse(x, y, 18, 8, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x, y - 4);
+  ctx.lineTo(x, y - 30);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255, 213, 74, 0.9)';
+  ctx.beginPath();
+  ctx.moveTo(x, y - 30);
+  ctx.lineTo(x + 16, y - 25);
+  ctx.lineTo(x, y - 20);
+  ctx.fill();
+}
+
+/** The hero: a knight on a horse, facing `facing` (1 right, -1 left). */
+function drawHero(ctx: CanvasRenderingContext2D, h: Hero, maxHp: number, time: number, facing: number): void {
+  const moving = h.state === 'walking';
+  const gallop = moving ? Math.sin(time * 16) : 0;
+  shadow(ctx, h.x, h.y, 30);
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  ctx.scale(facing, 1);
+  const bob = moving ? Math.abs(gallop) * 3 : 0;
+  // Legs
+  ctx.strokeStyle = '#5a3a20';
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  for (const [lx, phase] of [[-16, 0], [-8, 1], [10, 1], [18, 0]] as const) {
+    const swing = moving ? Math.sin(time * 16 + phase * Math.PI) * 6 : 0;
+    ctx.beginPath();
+    ctx.moveTo(lx, -20 - bob);
+    ctx.lineTo(lx + swing, -2);
+    ctx.stroke();
+  }
+  // Horse body, neck and head
+  ctx.fillStyle = h.hitAge < 0.08 ? '#ffffff' : '#8a5a33';
+  ctx.beginPath();
+  ctx.ellipse(0, -26 - bob, 26, 12, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(16, -32 - bob);
+  ctx.lineTo(28, -50 - bob);
+  ctx.lineTo(36, -46 - bob);
+  ctx.lineTo(26, -26 - bob);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(36, -46 - bob, 9, 5, 0.5, 0, Math.PI * 2);
+  ctx.fill();
+  // Mane and tail
+  ctx.strokeStyle = '#3b2414';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(18, -36 - bob);
+  ctx.lineTo(27, -52 - bob);
+  ctx.moveTo(-25, -28 - bob);
+  ctx.quadraticCurveTo(-36, -24 - bob, -34, -12 - bob + gallop * 2);
+  ctx.stroke();
+  // Blue caparison (horse blanket)
+  ctx.fillStyle = C.tabard;
+  ctx.fillRect(-14, -34 - bob, 20, 14);
+  ctx.fillStyle = C.gold;
+  ctx.fillRect(-14, -22 - bob, 20, 2);
+  // Rider
+  const ry = -44 - bob;
+  ctx.fillStyle = h.hitAge < 0.08 ? '#ffffff' : C.steel;
+  ctx.beginPath();
+  ctx.arc(-2, ry, 10, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(-2, ry - 14, 7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = C.steelDark;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-6, ry - 15);
+  ctx.lineTo(4, ry - 15);
+  ctx.stroke();
+  // Red plume
+  ctx.fillStyle = '#c0392b';
+  ctx.beginPath();
+  ctx.moveTo(-4, ry - 20);
+  ctx.quadraticCurveTo(-16, ry - 30, -18, ry - 16);
+  ctx.quadraticCurveTo(-10, ry - 22, -2, ry - 19);
+  ctx.fill();
+  // Sword, swinging while fighting
+  const swing = h.state === 'fighting' ? Math.sin(time * 9) * 0.9 : 0.4;
+  ctx.save();
+  ctx.translate(6, ry);
+  ctx.rotate(-1.1 + swing);
+  ctx.strokeStyle = '#eef2f6';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, -24);
+  ctx.stroke();
+  ctx.restore();
+  // Shield with a gold rim
+  ctx.fillStyle = C.tabard;
+  ctx.strokeStyle = C.gold;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-16, ry - 6);
+  ctx.lineTo(-6, ry - 6);
+  ctx.lineTo(-6, ry + 4);
+  ctx.lineTo(-11, ry + 9);
+  ctx.lineTo(-16, ry + 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+  // Health bar (gold-edged so it stands out from the knights')
+  if (h.hp < maxHp) {
+    const w = 44;
+    const f = Math.max(0, h.hp / maxHp);
+    const by = h.y - 84;
+    ctx.fillStyle = C.gold;
+    ctx.fillRect(h.x - w / 2 - 2, by - 2, w + 4, 9);
+    ctx.fillStyle = C.hpBack;
+    ctx.fillRect(h.x - w / 2, by, w, 5);
+    ctx.fillStyle = f > 0.35 ? C.hp : C.hpLow;
+    ctx.fillRect(h.x - w / 2, by, w * f, 5);
+  }
 }
 
 function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: number, time: number): void {

@@ -103,9 +103,19 @@ Each one is a version the owner can play from the link.
   number in plain words, with steps to change one on GitHub from the phone. Data mistakes
   (typos, armor above 0.95…) still block publishing; the bot's balance report no longer does
   (`npm run balance`). Owner's stars on 0.5: 1, 3 and 2.
-- **0.6**: Level Studio: draw a road with a finger, place build spots, set waves, then
+- **0.6 ✅** (owner chose the hero before the Level Studio): the **Mounted Knight**, a knight on
+  a horse. Tap it then tap a spot (or drag it) and it rides there and stands guard, holding two
+  enemies; it comes back 20 s after falling. Abilities bought with stars on the Hero screen
+  (stars = best stars of all levels added up, minus what was spent):
+  **Rallying Banner** (5 ★, passive): knights within 160 of the hero take 1/1.2 of the damage,
+  i.e. they last 20% longer. **Thundering Hooves** (10 ★): every 15 s, 35 damage (ignores
+  armor) to every ground enemy within 90 of the hero. Note: 3 levels give at most 9 stars, so
+  the second ability needs a 4th level or a lower price (owner to decide).
+  Also: upgrading a Knights' Hall brings fallen knights back straight away (owner's request).
+  Retuned for the hero: hero 240 hp; all enemies about 10% more health; full defences win
+  with 2 stars again (bot, hero left where it starts, no abilities).
+- **0.7**: Level Studio: draw a road with a finger, place build spots, set waves, then
   "Copy level" and paste it into the chat so Claude adds it to `data/levels.json`.
-- **0.7**: Hero: a knight champion you move by tapping, with 1–2 abilities.
 - **Later**: branching upgrades, sound, more levels, then Phase 2 and Phase 3.
 
 ## From the Gemini prototype
@@ -124,5 +134,6 @@ wording borrowed from other games.
 
 ## Open questions for the owner
 
-- Should the hero be a knight, or someone else (a dragon tamer?) — decide before 0.7.
+- The hero's name ("Mounted Knight" for now).
+- Thundering Hooves costs 10 ★ but 3 levels give at most 9: lower it, or add a 4th level?
 - How many levels for a first "complete" version?

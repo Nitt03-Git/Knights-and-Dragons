@@ -6,10 +6,11 @@ import '@fontsource/fredoka/latin-700.css';
 import './style.css';
 import { BALANCE, LEVELS } from './data';
 import { fitView, panView, Renderer, toScreen, toWorld, zoomView, type Overlay, type View } from './render';
-import { isUnlocked, loadProgress, saveStars } from './progress';
+import { buyAbility, isUnlocked, loadAbilities, loadProgress, saveStars, starsToSpend } from './progress';
 import { Game, STEP } from './sim';
+import type { HeroAbility } from './types';
 
-const VERSION = '0.5.1';
+const VERSION = '0.6';
 
 /** Towers in the build ring, clockwise from top-left. */
 const BUILD_RING: { type: string; icon: string; label: string; angle: number; soon?: string }[] = [
@@ -29,6 +30,7 @@ const ui = {
   speed: $<HTMLButtonElement>('speed'),
   pause: $<HTMLButtonElement>('pause'),
   callWave: $<HTMLButtonElement>('callWave'),
+  heroPill: $<HTMLButtonElement>('heroPill'),
   menu: $('menu'),
   banner: $('banner'),
   overlay: $('overlay'),
@@ -48,6 +50,9 @@ let paused = true;
 let selected: number | null = null;
 /** Pad of the hall whose flag the player is moving, if any. */
 let placingFlag: number | null = null;
+/** The hero is selected and waits for a tap on where to ride; or is being dragged there. */
+let heroSelected = false;
+let heroDrag: { x: number; y: number } | null = null;
 let shownEnd = false;
 let bannerTimer = 0;
 
@@ -96,11 +101,12 @@ function showLevels(): void {
     return `<button class="pill level${open ? '' : ' locked'}" data-level="${i}" ${open ? '' : 'disabled'}>
       <span class="num">${open ? i + 1 : '🔒'}</span><span class="name">${l.name}</span><span class="stars">${starRow}</span></button>`;
   }).join('');
+  const spend = starsToSpend(progress, loadAbilities(), BALANCE.hero);
   showCard(
     `<h1>Knights &amp; Dragons</h1>
      <p>Tap a stone spot to build. Bowmen shoot, knights hold the road, wizards ignore armor, catapults hit groups. Pinch to zoom.</p>
      <div class="levels">${cards}</div>`,
-    [],
+    [{ text: `🐴 Hero${spend > 0 ? ` · ★ ${spend}` : ''}`, onClick: showHero }],
   );
   ui.card.querySelectorAll<HTMLButtonElement>('button.level').forEach((b) => {
     b.onclick = () => {
@@ -108,6 +114,50 @@ function showLevels(): void {
       startLevel(Number(b.dataset.level));
     };
   });
+}
+
+const ABILITY_TEXT: Record<HeroAbility, string> = {
+  rally: 'Knights near the hero last 20% longer (they take less damage).',
+  stomp: 'Every 15 seconds the horse stamps: 35 damage to every enemy around the hero.',
+};
+
+function showHero(): void {
+  const hero = BALANCE.hero;
+  let armed: HeroAbility | null = null;
+  const render = () => {
+    const owned = loadAbilities();
+    const spend = starsToSpend(loadProgress(), owned, hero);
+    const rows = (['rally', 'stomp'] as HeroAbility[]).map((a) => {
+      const spec = hero[a];
+      const text = ABILITY_TEXT[a].replace('20%', `${Math.round(hero.rally.hpBoost * 100)}%`).replace('15 seconds', `${hero.stomp.every} seconds`).replace('35 damage', `${hero.stomp.damage} damage`);
+      const action = owned.includes(a)
+        ? '<span class="owned">✔ Owned</span>'
+        : spend >= spec.cost
+          ? `<button class="pill${armed === a ? ' armed' : ''}" data-buy="${a}">${armed === a ? `Sure? ★ ${spec.cost}` : `Buy ★ ${spec.cost}`}</button>`
+          : `<button class="pill" disabled>★ ${spec.cost}</button>`;
+      return `<div class="ability"><div class="info"><b>${spec.name}</b><span>${text}</span></div>${action}</div>`;
+    }).join('');
+    showCard(
+      `<h2>${hero.name}</h2>
+       <p>Tap the hero, then tap where to ride (or drag it there). It holds two enemies at a time and comes back after falling.</p>
+       <p class="spend">★ ${spend} star${spend === 1 ? '' : 's'} to spend</p>
+       <div class="abilities">${rows}</div>`,
+      [{ text: 'Back', main: true, onClick: showLevels }],
+    );
+    ui.card.querySelectorAll<HTMLButtonElement>('button[data-buy]').forEach((b) => {
+      b.onclick = () => {
+        const a = b.dataset.buy as HeroAbility;
+        if (armed === a) {
+          buyAbility(a, hero);
+          armed = null;
+        } else {
+          armed = a;
+        }
+        render();
+      };
+    });
+  };
+  render();
 }
 
 function showPause(): void {
@@ -140,9 +190,11 @@ function showEnd(): void {
 function startLevel(index: number): void {
   levelIndex = index;
   level = LEVELS[index];
-  game = new Game(level, BALANCE);
+  game = new Game(level, BALANCE, 1, loadAbilities());
   renderer = new Renderer(ctx, game);
   view = fitted;
+  heroSelected = false;
+  heroDrag = null;
   selected = null;
   shownEnd = false;
   closeMenu();
@@ -327,19 +379,45 @@ function hallAt(x: number, y: number): { pad: number; dist: number } | null {
   return best;
 }
 
+/** How far a finger is from the hero (rider and horse), if close enough to pick it. */
+function heroAt(x: number, y: number): number | null {
+  const h = game.hero;
+  if (h.state === 'dead') return null;
+  const dist = Math.min(Math.hypot(h.x - x, h.y - 25 - y), Math.hypot(h.x - x, h.y - 50 - y));
+  return dist < Math.max(40, 26 / view.scale) ? dist : null;
+}
+
+function selectHero(on: boolean): void {
+  if (on) {
+    closeMenu();
+    showBanner('Tap where the hero should ride<small>or drag the hero there</small>', Infinity);
+  } else if (heroSelected) {
+    hideBanner();
+  }
+  heroSelected = on;
+}
+
 function handleTap(sx: number, sy: number): void {
   if (!playing()) return;
   const w = toWorld(view, sx, sy);
   if (placingFlag !== null) return placeFlag(w.x, w.y);
+  const heroDist = heroAt(w.x, w.y);
+  if (heroSelected) {
+    selectHero(false);
+    if (heroDist === null) game.moveHero(w.x, w.y);
+    return;
+  }
   const pad = padAt(w.x, w.y);
   const hall = hallAt(w.x, w.y);
+  if (heroDist !== null && heroDist <= (pad?.dist ?? Infinity) && heroDist <= (hall?.dist ?? Infinity)) return selectHero(true);
   const hit = pad && (!hall || pad.dist <= hall.dist) ? pad.pad : hall?.pad ?? null;
   if (hit !== null && hit !== selected) openMenu(hit);
   else closeMenu();
 }
 
 type Gesture =
-  | { kind: 'tap'; x: number; y: number; hall: number | null }
+  | { kind: 'tap'; x: number; y: number; hall: number | null; hero: boolean }
+  | { kind: 'hero' }
   | { kind: 'pan' }
   | { kind: 'pinch'; dist: number; mx: number; my: number }
   | { kind: 'flag'; pad: number };
@@ -371,8 +449,11 @@ canvas.addEventListener('pointerdown', (e) => {
     gesture = { kind: 'pinch', ...pinchState() };
   } else if (pointers.size === 1) {
     const w = toWorld(view, e.clientX, e.clientY);
-    const hall = playing() && placingFlag === null ? hallAt(w.x, w.y) : null;
-    gesture = { kind: 'tap', x: e.clientX, y: e.clientY, hall: hall?.pad ?? null };
+    const free = playing() && placingFlag === null;
+    const hall = free ? hallAt(w.x, w.y) : null;
+    const heroDist = free ? heroAt(w.x, w.y) : null;
+    const hero = heroDist !== null && heroDist <= (hall?.dist ?? Infinity);
+    gesture = { kind: 'tap', x: e.clientX, y: e.clientY, hall: hero ? null : hall?.pad ?? null, hero };
   }
 });
 
@@ -386,7 +467,13 @@ canvas.addEventListener('pointermove', (e) => {
   switch (gesture.kind) {
     case 'tap': {
       if (Math.hypot(e.clientX - gesture.x, e.clientY - gesture.y) < 12) return;
-      if (gesture.hall !== null) {
+      if (gesture.hero) {
+        // Dragging the hero: it rides to where it is dropped.
+        selectHero(false);
+        closeMenu();
+        gesture = { kind: 'hero' };
+        heroDrag = toWorld(view, e.clientX, e.clientY);
+      } else if (gesture.hall !== null) {
         // Dragging knights (or their flag) moves the flag.
         const pad = gesture.hall;
         closeMenu();
@@ -412,12 +499,19 @@ canvas.addEventListener('pointermove', (e) => {
     case 'flag':
       dragFlagTo(gesture.pad, e.clientX, e.clientY);
       break;
+    case 'hero':
+      heroDrag = toWorld(view, e.clientX, e.clientY);
+      break;
   }
 });
 
 function pointerEnd(e: PointerEvent): void {
   if (!pointers.delete(e.pointerId) || !gesture) return;
   if (gesture.kind === 'tap' && e.type === 'pointerup') handleTap(e.clientX, e.clientY);
+  if (gesture.kind === 'hero') {
+    if (heroDrag && playing()) game.moveHero(heroDrag.x, heroDrag.y);
+    heroDrag = null;
+  }
   if (gesture.kind === 'flag') {
     if (drag?.snap && playing()) game.setRally(gesture.pad, drag.snap.x, drag.snap.y);
     drag = null;
@@ -441,6 +535,9 @@ ui.pause.onclick = () => (paused ? (hideCard(), (paused = false)) : showPause())
 ui.speed.onclick = () => {
   speed = speed === 1 ? 2 : 1;
   ui.speed.textContent = `${speed}×`;
+};
+ui.heroPill.onclick = () => {
+  if (playing() && game.hero.state !== 'dead') selectHero(!heroSelected);
 };
 ui.callWave.onclick = () => {
   if (!paused) game.callWave();
@@ -466,6 +563,12 @@ function updateHud(): void {
     ui.callWave.classList.toggle('first', game.wavesStarted === 0);
   }
   for (const update of ring) update();
+  const h = game.hero;
+  const pill = h.state === 'dead'
+    ? `🐴 back in ${Math.ceil(h.respawnIn)}s`
+    : `🐴 <span class="bar"><i style="width:${Math.round((100 * h.hp) / BALANCE.hero.hp)}%"></i></span>`;
+  if (ui.heroPill.innerHTML !== pill) ui.heroPill.innerHTML = pill;
+  ui.heroPill.classList.toggle('selected', heroSelected);
 }
 
 let last = performance.now();
@@ -485,7 +588,7 @@ function frame(now: number): void {
       showBanner(`Wave ${ev.wave} of ${game.totalWaves}${ev.bonus ? `<small>+${ev.bonus} gold for calling early</small>` : ''}`);
     }
   }
-  renderer.draw(game, view, paused ? 0 : dt * speed, { selected, placingFlag: placingFlag !== null, preview, drag });
+  renderer.draw(game, view, paused ? 0 : dt * speed, { selected, placingFlag: placingFlag !== null, preview, drag, heroSelected, heroDrag });
   game.events.length = 0;
   if (bannerTimer > 0 && (bannerTimer -= dt) <= 0) ui.banner.hidden = true;
   updateHud();

@@ -72,8 +72,30 @@ export interface EnemySpec {
   flying?: boolean;
 }
 
+/** The hero: a mounted knight the player moves around, with abilities bought with stars. */
+export interface HeroSpec {
+  name: string;
+  hp: number;
+  armor: number;
+  damage: [number, number];
+  cooldown: number;
+  speed: number;
+  regen: number;
+  respawn: number;
+  holds: number;
+  /** How far from where it stands the hero rides out to fight. */
+  engageRange: number;
+  /** Ability 1 (passive): knights near the hero take less damage, as if they had `hpBoost` more health. */
+  rally: { name: string; cost: number; radius: number; hpBoost: number };
+  /** Ability 2: every `every` seconds, `damage` to all ground enemies within `radius` (ignores armor). */
+  stomp: { name: string; cost: number; every: number; radius: number; damage: number };
+}
+
+export type HeroAbility = 'rally' | 'stomp';
+
 export interface Balance {
   rules: Rules;
+  hero: HeroSpec;
   towers: Record<string, TowerSpec>;
   enemies: Record<string, EnemySpec>;
 }
@@ -93,6 +115,8 @@ export interface Level {
   name: string;
   /** Overrides the rules' starting gold for this level. */
   startGold?: number;
+  /** Where the hero starts; when left out, on the first road a little past halfway. */
+  heroStart?: Point;
   paths: { points: Point[] }[];
   pads: Point[];
   waves: { groups: WaveGroup[] }[];

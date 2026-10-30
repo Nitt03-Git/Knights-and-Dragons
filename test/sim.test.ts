@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildPath, distanceToPath, pointAt } from '../src/path';
-import { isUnlocked, loadProgress, saveStars } from '../src/progress';
+import { earnedStars, isUnlocked, loadProgress, saveStars, starsToSpend } from '../src/progress';
 import { damageAfterDefence, Game, WORLD_H, WORLD_W, type Tower } from '../src/sim';
+import type { HeroAbility } from '../src/types';
 import { BALANCE, LEVELS } from './bot';
 
 describe('road', () => {
@@ -188,6 +189,13 @@ describe('progress', () => {
     expect(isUnlocked(LEVELS, 2, { [LEVELS[0].id]: 3 })).toBe(false);
   });
 
+  it('counts stars to spend on the hero', () => {
+    const p = { a: 3, b: 2 };
+    expect(earnedStars(p)).toBe(5);
+    expect(starsToSpend(p, [], BALANCE.hero)).toBe(5);
+    expect(starsToSpend(p, ['rally'], BALANCE.hero)).toBe(5 - BALANCE.hero.rally.cost);
+  });
+
   it('survives having no storage at all', () => {
     expect(loadProgress()).toEqual({});
     expect(saveStars('x', 2)).toEqual({ x: 2 });
@@ -206,7 +214,7 @@ describe('knights holding several enemies', () => {
     for (let i = 0; i < 60 * 60 && !g.isOver(); i++) {
       g.step();
       for (const k of g.towers[0]!.knights) most = Math.max(most, k.holding.length);
-      for (const e of g.enemies) if (e.heldBy !== null) expect(g.towers[0]!.knights.find((k) => k.id === e.heldBy)!.holding).toContain(e.id);
+      for (const e of g.enemies) if (e.heldBy !== null && e.heldBy !== g.hero.id) expect(g.towers[0]!.knights.find((k) => k.id === e.heldBy)!.holding).toContain(e.id);
     }
     expect(most).toBeGreaterThan(1);
     expect(most).toBeLessThanOrEqual(3);
@@ -271,4 +279,82 @@ describe('data/balance.json makes sense', () => {
       }
     });
   }
+});
+
+describe('hero', () => {
+  const level = LEVELS[0];
+  const wave = (enemy: string, count: number, interval: number) => ({ ...level, waves: [{ groups: [{ enemy, count, interval }] }] });
+
+  it('rides where it is sent and holds enemies there', () => {
+    const g = new Game(wave('brute', 8, 1), BALANCE);
+    const spot = pointAt(g.paths[0], 400);
+    expect(g.moveHero(spot.x, spot.y)).toBe(true);
+    for (let i = 0; i < 60 * 10; i++) g.step();
+    expect(Math.hypot(g.hero.x - spot.x, g.hero.y - spot.y)).toBeLessThan(1);
+    g.callWave();
+    let most = 0;
+    for (let i = 0; i < 60 * 30 && !g.isOver(); i++) {
+      g.step();
+      most = Math.max(most, g.hero.holding.length);
+    }
+    expect(most).toBeGreaterThan(0);
+    expect(most).toBeLessThanOrEqual(BALANCE.hero.holds);
+  });
+
+  it('stomps only once bought, every few seconds, for its damage', () => {
+    const stomps = (abilities: HeroAbility[]) => {
+      const g = new Game(wave('troll', 1, 1), BALANCE, 1, abilities);
+      g.callWave();
+      let n = 0;
+      for (let i = 0; i < 60 * 60 && !g.isOver(); i++) {
+        g.step();
+        n += g.events.filter((e) => e.kind === 'boom' && e.stomp).length;
+        g.events.length = 0;
+      }
+      return n;
+    };
+    expect(stomps([])).toBe(0);
+    expect(stomps(['stomp'])).toBeGreaterThan(0);
+    const g = new Game(wave('troll', 1, 1), BALANCE, 1, ['stomp']);
+    g.callWave();
+    const troll = () => g.enemies[0];
+    while (!g.events.some((e) => e.kind === 'boom' && e.stomp)) {
+      g.events.length = 0;
+      const before = troll()?.hp;
+      g.step();
+      if (g.events.some((e) => e.kind === 'boom' && e.stomp)) expect(before! - troll().hp).toBeGreaterThanOrEqual(BALANCE.hero.stomp.damage);
+    }
+    expect(g.hero.stompIn).toBe(BALANCE.hero.stomp.every);
+  });
+
+  it('rally makes nearby knights last longer', () => {
+    const lostHp = (abilities: HeroAbility[]) => {
+      const g = new Game(wave('brute', 1, 1), BALANCE, 1, abilities);
+      g.build(0, 'knights');
+      const t = g.towers[0]!;
+      for (let i = 0; i < 60 * 5; i++) g.step();
+      g.moveHero(t.rally!.x + 30, t.rally!.y - 60);
+      for (let i = 0; i < 60 * 5; i++) g.step();
+      expect(g.inRally(t.knights[0])).toBe(abilities.includes('rally'));
+      const k = t.knights[0];
+      const hp = k.hp;
+      for (let i = 0; i < 100; i++) (g as unknown as { hitHolder: (k: unknown, a: [number, number]) => void }).hitHolder(k, [0.1, 0.1]);
+      return hp - k.hp;
+    };
+    expect(lostHp(['rally'])).toBeCloseTo(lostHp([]) / (1 + BALANCE.hero.rally.hpBoost));
+  });
+});
+
+describe('upgrading a hall', () => {
+  it('brings fallen knights back straight away', () => {
+    const g = new Game(LEVELS[0], BALANCE);
+    g.gold = 1e6;
+    g.build(0, 'knights');
+    const k = g.towers[0]!.knights[0];
+    k.state = 'dead';
+    k.respawnIn = 99;
+    g.upgrade(0);
+    expect(k.state).not.toBe('dead');
+    expect(k.hp).toBe(BALANCE.towers.knights.levels[1].unit!.hp);
+  });
 });

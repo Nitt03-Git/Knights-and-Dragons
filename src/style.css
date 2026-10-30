@@ -359,3 +359,82 @@ button.level.locked {
   color: rgba(255, 255, 255, 0.55);
   pointer-events: none;
 }
+
+.heroPill {
+  position: fixed;
+  left: max(10px, env(safe-area-inset-left));
+  bottom: max(22px, calc(env(safe-area-inset-bottom) + 18px));
+  padding: 6px 12px;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.heroPill.selected {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35);
+}
+
+.heroPill .bar {
+  width: 64px;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.heroPill .bar i {
+  display: block;
+  height: 100%;
+  background: var(--green);
+}
+
+.abilities {
+  text-align: left;
+  margin-top: 8px;
+}
+
+.ability {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(201, 162, 90, 0.35);
+}
+
+.ability .info {
+  flex: 1;
+}
+
+.ability .info b {
+  color: var(--text);
+}
+
+.ability .info span {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ability button {
+  padding: 8px 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ability button.armed {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(255, 213, 74, 0.45);
+}
+
+.ability .owned {
+  color: #9fe08a;
+  font-weight: 700;
+}
+
+.spend {
+  color: var(--gold);
+  font-weight: 700;
+}

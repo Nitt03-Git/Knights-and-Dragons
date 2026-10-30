@@ -50,6 +50,20 @@ far from the hall the flag may go, and `unit` describes the knights:
 | `regen` | Health per second regained while not fighting | 6 |
 | `speed` | Walking speed | 90 |
 
+## The hero (`balance.json` → `hero`)
+
+| Name | What it does | Now |
+|---|---|---|
+| `name` | Shown on the Hero screen | Mounted Knight |
+| `hp`, `armor`, `regen`, `respawn`, `speed`, `holds` | As for knights | 240, 0.3, 8, 20, 150, 2 |
+| `damage`, `cooldown` | Its sword blows | [10, 15], 0.9 |
+| `engageRange` | How far from where it stands it rides out to fight | 100 |
+| `rally.cost` / `stomp.cost` | Stars to buy each ability | 5 / 10 |
+| `rally.radius`, `rally.hpBoost` | Rallying Banner: reach, and how much longer knights last (0.2 = 20%) | 160, 0.2 |
+| `stomp.every`, `stomp.damage`, `stomp.radius` | Thundering Hooves: seconds between stamps, damage, reach | 15, 35, 90 |
+
+Each level in `levels.json` can also set `"heroStart": [x, y]`, where the hero begins.
+
 ## Enemies (`balance.json` → `enemies`)
 
 | Name | What it does |

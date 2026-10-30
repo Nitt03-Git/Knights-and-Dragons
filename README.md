@@ -30,6 +30,9 @@ If it still shows an older build, wait a few minutes: GitHub Pages caches the pa
 - To move the knights, drag them (or their flag) to another part of the road. Or tap their
   hall, then **🚩 Move flag**, then tap the road inside the blue circle.
 - Pinch to zoom in and out; drag the map to look around when zoomed in.
+- Your **hero**, a knight on a horse: tap it, then tap where it should ride (or drag it
+  there). The 🐴 button bottom-left shows its health and also selects it. Spend the stars you
+  win on its abilities: **🐴 Hero** on the level screen.
 - Pick a level. Each level opens once you've won the one before; your best stars are kept on
   this phone (clearing Chrome's site data for the game resets them).
 - Tap **⚔ Start wave 1** when you're ready. Later waves start by themselves; calling them

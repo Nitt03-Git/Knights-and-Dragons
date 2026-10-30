@@ -2,7 +2,7 @@
 // so the same game can run in tests, at 2x speed, or behind any art style.
 import { buildPath, pointAt, type Path } from './path';
 import { makeRng } from './rng';
-import type { Balance, DamageType, EnemySpec, Level, TowerLevel } from './types';
+import type { Balance, DamageType, EnemySpec, HeroAbility, Level, TowerLevel } from './types';
 
 /** World size in units. Levels are drawn in this space and the screen scales it to fit. */
 export const WORLD_W = 1600;
@@ -59,6 +59,28 @@ export interface Knight {
   hitAge: number;
 }
 
+export interface Hero {
+  id: number;
+  x: number;
+  y: number;
+  hp: number;
+  state: KnightState;
+  target: number | null;
+  holding: number[];
+  cooldown: number;
+  respawnIn: number;
+  hitAge: number;
+  /** Where the hero stands guard, and where it is riding to after an order. */
+  home: { x: number; y: number };
+  dest: { x: number; y: number } | null;
+  /** Seconds until the stomp is ready again, and since the last one (for drawing). */
+  stompIn: number;
+  stompAge: number;
+}
+
+/** Anything that holds enemies in place and gets hit by them. */
+type Holder = Knight | Hero;
+
 export interface Rally {
   path: number;
   d: number;
@@ -104,7 +126,7 @@ export type GameEvent =
   | { kind: 'gold'; x: number; y: number; amount: number }
   | { kind: 'leak'; x: number; y: number; lives: number }
   | { kind: 'wave'; wave: number; bonus: number }
-  | { kind: 'boom'; x: number; y: number; radius: number };
+  | { kind: 'boom'; x: number; y: number; radius: number; stomp?: boolean };
 
 interface Spawner {
   enemy: string;
@@ -144,9 +166,11 @@ export class Game {
   private nextId = 1;
   private rng: () => number;
   private enemyById = new Map<number, Enemy>();
-  private knightById = new Map<number, Knight>();
+  private holders = new Map<number, Holder>();
+  readonly hero: Hero;
+  readonly abilities: ReadonlySet<HeroAbility>;
 
-  constructor(readonly level: Level, readonly balance: Balance, seed = 1) {
+  constructor(readonly level: Level, readonly balance: Balance, seed = 1, abilities: HeroAbility[] = []) {
     this.paths = level.paths.map((p) => buildPath(p.points));
     this.pads = level.pads.map(([x, y]) => ({ x, y }));
     this.towers = level.pads.map(() => null);
@@ -154,6 +178,24 @@ export class Game {
     this.gold = level.startGold ?? balance.rules.startGold;
     this.lives = balance.rules.lives;
     this.rng = makeRng(seed);
+    this.abilities = new Set(abilities);
+    const start = level.heroStart ? { x: level.heroStart[0], y: level.heroStart[1] } : pointAt(this.paths[0], this.paths[0].length * 0.55);
+    this.hero = {
+      id: this.nextId++,
+      x: start.x,
+      y: start.y,
+      hp: balance.hero.hp,
+      state: 'idle',
+      target: null,
+      holding: [],
+      cooldown: 0,
+      respawnIn: 0,
+      hitAge: 9,
+      home: { ...start },
+      dest: null,
+      stompIn: 0,
+      stompAge: 9,
+    };
   }
 
   get rules() {
@@ -208,16 +250,22 @@ export class Game {
     return this.towerLevel(t.type, t.level + 1)?.cost ?? null;
   }
 
-  upgrade(pad: number): boolean {
-    const t = this.towers[pad];
-    const cost = this.upgradeCost(pad);
+  upgrade(pad_: number): boolean {
+    const t = this.towers[pad_];
+    const cost = this.upgradeCost(pad_);
     if (!t || cost === null || this.gold < cost || this.isOver()) return false;
     this.gold -= cost;
     t.level++;
     t.spent += cost;
-    // Upgraded knights come back to full (new) health.
+    // Upgraded knights come back to full (new) health, fallen ones straight away.
     const unit = this.towerLevel(t.type, t.level)?.unit;
-    if (unit) for (const k of t.knights) if (k.state !== 'dead') k.hp = unit.hp;
+    const pad = this.pads[pad_];
+    if (unit) {
+      for (const k of t.knights) {
+        if (k.state === 'dead') Object.assign(k, { state: 'walking', x: pad.x, y: pad.y, target: null, holding: [], respawnIn: 0 });
+        k.hp = unit.hp;
+      }
+    }
     return true;
   }
 
@@ -262,6 +310,22 @@ export class Game {
     return true;
   }
 
+  /** Sends the hero riding to (x, y); it stands guard there. False while it is down. */
+  moveHero(x: number, y: number): boolean {
+    const h = this.hero;
+    if (h.state === 'dead' || this.isOver()) return false;
+    h.dest = { x: Math.max(20, Math.min(WORLD_W - 20, x)), y: Math.max(60, Math.min(WORLD_H - 20, y)) };
+    this.release(h);
+    h.target = null;
+    return true;
+  }
+
+  /** Whether a knight stands close enough to the hero to get the rally ability's boost. */
+  inRally(k: { x: number; y: number }): boolean {
+    const h = this.hero;
+    return this.abilities.has('rally') && h.state !== 'dead' && Math.hypot(k.x - h.x, k.y - h.y) <= this.balance.hero.rally.radius;
+  }
+
   isOver(): boolean {
     return this.phase === 'won' || this.phase === 'lost';
   }
@@ -287,12 +351,14 @@ export class Game {
     this.time += dt;
     this.enemyById.clear();
     for (const e of this.enemies) this.enemyById.set(e.id, e);
-    this.knightById.clear();
-    for (const t of this.towers) if (t) for (const k of t.knights) this.knightById.set(k.id, k);
+    this.holders.clear();
+    for (const t of this.towers) if (t) for (const k of t.knights) this.holders.set(k.id, k);
+    this.holders.set(this.hero.id, this.hero);
 
     this.updateWaves(dt);
     this.updateEnemies(dt);
     this.updateTowers(dt);
+    this.updateHero(dt);
     this.updateProjectiles(dt);
     this.enemies = this.enemies.filter((e) => e.alive);
     this.projectiles = this.projectiles.filter((p) => !p.done);
@@ -348,14 +414,14 @@ export class Game {
 
       // Held by a knight: stand still and fight back once the knight has arrived.
       if (e.heldBy !== null) {
-        const k = this.knightById.get(e.heldBy);
+        const k = this.holders.get(e.heldBy);
         if (!k || k.state === 'dead' || !k.holding.includes(e.id)) e.heldBy = null;
         else {
           e.attackCooldown -= dt;
           // Enemies held next to a fighting knight hit back.
           const close = Math.hypot(k.x - e.x, k.y - e.y) <= e.spec.size + 14 + HOLD_REACH;
           if (k.state === 'fighting' && close && e.attackCooldown <= 0) {
-            this.hitKnight(k, e.spec.attack);
+            this.hitHolder(k, e.spec.attack);
             e.attackCooldown = e.spec.attackCooldown;
           }
           continue;
@@ -438,68 +504,16 @@ export class Game {
         const e = this.enemyById.get(id);
         return !!e?.alive && e.heldBy === k.id;
       });
-      let target = k.target === null ? undefined : this.enemyById.get(k.target);
-      if (!target?.alive) {
-        k.target = null;
-        target = k.holding.length ? this.enemyById.get(k.holding[0]) : this.findFoe(t);
-        if (target) k.target = target.id;
-      }
-      if (target && target.heldBy === null) {
-        if (k.holding.length < unit.holds) {
-          target.heldBy = k.id;
-          k.holding.push(target.id);
-        } else {
-          // Already holding as many as it can: keep fighting one of those instead.
-          target = this.enemyById.get(k.holding[0]);
-          k.target = target?.id ?? null;
-        }
-      }
-      // A knight standing in the road also stops other enemies that walk into it, up to `holds`.
-      if (k.state === 'fighting' && k.holding.length < unit.holds) {
-        for (const e of this.enemies) {
-          if (k.holding.length >= unit.holds) break;
-          if (!e.alive || e.spec.flying || e.heldBy !== null) continue;
-          if (Math.hypot(e.x - k.x, e.y - k.y) > e.spec.size + 14 + HOLD_REACH) continue;
-          e.heldBy = k.id;
-          k.holding.push(e.id);
-        }
-      }
-
-      if (target) {
-        const reach = target.spec.size + 14;
-        const dist = Math.hypot(k.x - target.x, k.y - target.y);
-        if (dist > reach + 1) {
-          k.state = 'walking';
-          this.walk(k, target.x, target.y, Math.min(unit.speed * dt, dist - reach));
-        } else {
-          k.state = 'fighting';
-          k.cooldown -= dt;
-          if (k.cooldown <= 0) {
-            this.hit(target, this.roll(spec.damage), spec.damageType);
-            k.cooldown = spec.cooldown;
-          }
-        }
-      } else {
-        const post = this.knightPost(t, k.slot);
-        const dist = Math.hypot(post.x - k.x, post.y - k.y);
-        if (dist < 1) {
-          k.state = 'idle';
-          k.hp = Math.min(unit.hp, k.hp + unit.regen * dt);
-        } else {
-          k.state = 'walking';
-          this.walk(k, post.x, post.y, Math.min(unit.speed * dt, dist));
-        }
-      }
+      this.fight(k, unit, spec.damage, spec.cooldown, spec.damageType, this.knightPost(t, k.slot), ENGAGE_RANGE, dt);
     }
   }
 
-  /** A foe for a knight: free enemies near the flag first, then help a fellow knight. */
-  private findFoe(t: Tower): Enemy | undefined {
-    const r = t.rally!;
+  /** A foe near (x, y): free enemies first, then help someone already holding one. */
+  private findFoe(x: number, y: number, range: number): Enemy | undefined {
     let best: Enemy | undefined;
     let bestScore = Infinity;
     for (const e of this.enemies) {
-      if (!e.alive || e.spec.flying || Math.hypot(e.x - r.x, e.y - r.y) > ENGAGE_RANGE) continue;
+      if (!e.alive || e.spec.flying || Math.hypot(e.x - x, e.y - y) > range) continue;
       const score = (e.heldBy === null ? 0 : 1e6) + (this.paths[e.path].length - e.d);
       if (score < bestScore) {
         best = e;
@@ -509,7 +523,7 @@ export class Game {
     return best;
   }
 
-  private walk(k: Knight, x: number, y: number, step: number): void {
+  private walk(k: { x: number; y: number }, x: number, y: number, step: number): void {
     const dx = x - k.x;
     const dy = y - k.y;
     const len = Math.hypot(dx, dy) || 1;
@@ -517,21 +531,145 @@ export class Game {
     k.y += (dy / len) * step;
   }
 
-  private hitKnight(k: Knight, [lo, hi]: [number, number]): void {
-    const t = this.towers[k.pad];
-    const unit = t && this.towerLevel(t.type, t.level)?.unit;
-    if (!unit) return;
-    k.hp -= damageAfterDefence(lo + this.rng() * (hi - lo), 'physical', unit);
+  private updateHero(dt: number): void {
+    const h = this.hero;
+    const spec = this.balance.hero;
+    h.hitAge += dt;
+    h.stompAge += dt;
+    if (h.state === 'dead') {
+      h.respawnIn -= dt;
+      if (h.respawnIn <= 0) Object.assign(h, { state: 'walking', hp: spec.hp, x: h.home.x, y: h.home.y, target: null, holding: [], dest: null });
+      return;
+    }
+    h.holding = h.holding.filter((id) => {
+      const e = this.enemyById.get(id);
+      return !!e?.alive && e.heldBy === h.id;
+    });
+
+    if (h.dest) {
+      // Riding to a new spot: no fighting on the way.
+      const dist = Math.hypot(h.dest.x - h.x, h.dest.y - h.y);
+      if (dist <= spec.speed * dt) {
+        h.x = h.dest.x;
+        h.y = h.dest.y;
+        h.home = h.dest;
+        h.dest = null;
+        h.state = 'idle';
+      } else {
+        h.state = 'walking';
+        this.walk(h, h.dest.x, h.dest.y, spec.speed * dt);
+      }
+    } else {
+      this.fight(h, spec, spec.damage, spec.cooldown, 'physical', h.home, spec.engageRange, dt);
+    }
+
+    if (this.abilities.has('stomp')) {
+      const stomp = spec.stomp;
+      h.stompIn = Math.max(0, h.stompIn - dt);
+      if (h.stompIn === 0) {
+        const hits = this.enemies.filter((e) => e.alive && !e.spec.flying && Math.hypot(e.x - h.x, e.y - h.y) <= stomp.radius);
+        if (hits.length) {
+          for (const e of hits) this.hit(e, stomp.damage, 'physical', 1);
+          this.events.push({ kind: 'boom', x: h.x, y: h.y, radius: stomp.radius, stomp: true });
+          h.stompIn = stomp.every;
+          h.stompAge = 0;
+        }
+      }
+    }
+  }
+
+  /** One holder's turn: pick a foe near `post`, hold it, walk up and hit it; otherwise return to `post` and heal. */
+  private fight(
+    k: Holder,
+    unit: { holds: number; speed: number; regen: number; hp: number },
+    damage: [number, number],
+    cooldown: number,
+    damageType: DamageType,
+    post: { x: number; y: number },
+    range: number,
+    dt: number,
+  ): void {
+    let target = k.target === null ? undefined : this.enemyById.get(k.target);
+    if (!target?.alive) {
+      k.target = null;
+      target = k.holding.length ? this.enemyById.get(k.holding[0]) : this.findFoe(post.x, post.y, range);
+      if (target) k.target = target.id;
+    }
+    if (target && target.heldBy === null) {
+      if (k.holding.length < unit.holds) {
+        target.heldBy = k.id;
+        k.holding.push(target.id);
+      } else {
+        target = this.enemyById.get(k.holding[0]);
+        k.target = target?.id ?? null;
+      }
+    }
+    if (k.state === 'fighting' && k.holding.length < unit.holds) {
+      for (const e of this.enemies) {
+        if (k.holding.length >= unit.holds) break;
+        if (!e.alive || e.spec.flying || e.heldBy !== null) continue;
+        if (Math.hypot(e.x - k.x, e.y - k.y) > e.spec.size + 14 + HOLD_REACH) continue;
+        e.heldBy = k.id;
+        k.holding.push(e.id);
+      }
+    }
+    if (target) {
+      const reach = target.spec.size + 14;
+      const dist = Math.hypot(k.x - target.x, k.y - target.y);
+      if (dist > reach + 1) {
+        k.state = 'walking';
+        this.walk(k, target.x, target.y, Math.min(unit.speed * dt, dist - reach));
+      } else {
+        k.state = 'fighting';
+        k.cooldown -= dt;
+        if (k.cooldown <= 0) {
+          this.hit(target, this.roll(damage), damageType);
+          k.cooldown = cooldown;
+        }
+      }
+    } else {
+      const dist = Math.hypot(post.x - k.x, post.y - k.y);
+      if (dist < 1) {
+        k.state = 'idle';
+        k.hp = Math.min(unit.hp, k.hp + unit.regen * dt);
+      } else {
+        k.state = 'walking';
+        this.walk(k, post.x, post.y, Math.min(unit.speed * dt, dist));
+      }
+    }
+  }
+
+  /** Lets go of every enemy this holder holds. */
+  private release(k: Holder): void {
+    for (const id of k.holding) {
+      const e = this.enemyById.get(id);
+      if (e?.heldBy === k.id) e.heldBy = null;
+    }
+    k.holding = [];
+  }
+
+  private hitHolder(k: Holder, [lo, hi]: [number, number]): void {
+    let armor: number;
+    let respawn: number;
+    let boost = 1;
+    if (k === this.hero) {
+      armor = this.balance.hero.armor;
+      respawn = this.balance.hero.respawn;
+    } else {
+      const t = this.towers[(k as Knight).pad];
+      const unit = t && this.towerLevel(t.type, t.level)?.unit;
+      if (!unit) return;
+      armor = unit.armor;
+      respawn = unit.respawn;
+      if (this.inRally(k)) boost = 1 + this.balance.hero.rally.hpBoost;
+    }
+    k.hp -= damageAfterDefence(lo + this.rng() * (hi - lo), 'physical', { armor }) / boost;
     k.hitAge = 0;
     if (k.hp <= 0) {
       k.state = 'dead';
-      k.respawnIn = unit.respawn;
+      k.respawnIn = respawn;
       k.target = null;
-      for (const id of k.holding) {
-        const e = this.enemyById.get(id);
-        if (e?.heldBy === k.id) e.heldBy = null;
-      }
-      k.holding = [];
+      this.release(k);
     }
   }
 
