@@ -176,7 +176,7 @@ export class Game {
     const tower: Tower = { pad, type, level: 0, cooldown: 0.3, spent: spec.cost, shotAge: 9, rally: null, knights: [] };
     if (spec.unit) {
       const p = this.pads[pad];
-      tower.rally = this.nearestRoad((s) => Math.hypot(s.x - p.x, s.y - p.y));
+      tower.rally = this.defaultRally(pad);
       for (let slot = 0; slot < spec.unit.count; slot++) {
         tower.knights.push({ id: this.nextId++, pad, slot, x: p.x, y: p.y, hp: spec.unit.hp, state: 'walking', target: null, cooldown: 0, respawnIn: 0, hitAge: 9 });
       }
@@ -216,14 +216,27 @@ export class Game {
     return true;
   }
 
+  /** Where a hall's flag would stand for a tap at (x, y): the nearest road within the hall's reach, or null. */
+  rallyFor(pad: number, x: number, y: number): Rally | null {
+    const t = this.towers[pad];
+    const spec = t && this.towerLevel(t.type, t.level);
+    if (!t || !spec?.unit) return null;
+    const p = this.pads[pad];
+    const rally = this.nearestRoad((s) => (Math.hypot(s.x - p.x, s.y - p.y) <= spec.range ? Math.hypot(s.x - x, s.y - y) : Infinity));
+    return rally && Math.hypot(rally.x - x, rally.y - y) <= FLAG_SNAP ? rally : null;
+  }
+
+  /** Where a new hall on this pad puts its flag: the nearest road. */
+  defaultRally(pad: number): Rally | null {
+    const p = this.pads[pad];
+    return this.nearestRoad((s) => Math.hypot(s.x - p.x, s.y - p.y));
+  }
+
   /** Moves a hall's flag to the road near (x, y). False if that isn't on the road within the hall's reach. */
   setRally(pad: number, x: number, y: number): boolean {
     const t = this.towers[pad];
-    const spec = t && this.towerLevel(t.type, t.level);
-    if (!t || !spec?.unit) return false;
-    const p = this.pads[pad];
-    const rally = this.nearestRoad((s) => (Math.hypot(s.x - p.x, s.y - p.y) <= spec.range ? Math.hypot(s.x - x, s.y - y) : Infinity));
-    if (!rally || Math.hypot(rally.x - x, rally.y - y) > FLAG_SNAP) return false;
+    const rally = this.rallyFor(pad, x, y);
+    if (!t || !rally) return false;
     t.rally = rally;
     for (const k of t.knights) k.target = null;
     return true;

@@ -18,6 +18,39 @@ export function fitView(width: number, height: number, dpr: number): View {
   return { scale, ox: (width - WORLD_W * scale) / 2, oy: (height - WORLD_H * scale) / 2, dpr, width, height };
 }
 
+/** How far the player can zoom in, compared with the whole map on screen. */
+export const MAX_ZOOM = 2.5;
+
+/** Keeps the map filling the screen: no panning past its edges, centred when it's smaller. */
+export function clampView(v: View): View {
+  const ww = WORLD_W * v.scale;
+  const wh = WORLD_H * v.scale;
+  const ox = ww <= v.width ? (v.width - ww) / 2 : Math.min(0, Math.max(v.width - ww, v.ox));
+  const oy = wh <= v.height ? (v.height - wh) / 2 : Math.min(0, Math.max(v.height - wh, v.oy));
+  return { ...v, ox, oy };
+}
+
+/** Zooms by `factor` around the screen point (fx, fy), between the fitted view and MAX_ZOOM. */
+export function zoomView(v: View, fitted: View, factor: number, fx: number, fy: number): View {
+  const scale = Math.min(fitted.scale * MAX_ZOOM, Math.max(fitted.scale, v.scale * factor));
+  const f = scale / v.scale;
+  return clampView({ ...v, scale, ox: fx - (fx - v.ox) * f, oy: fy - (fy - v.oy) * f });
+}
+
+export function panView(v: View, dx: number, dy: number): View {
+  return clampView({ ...v, ox: v.ox + dx, oy: v.oy + dy });
+}
+
+/** What the screen wants drawn on top of the game: selections, previews, a flag being dragged. */
+export interface Overlay {
+  selected: number | null;
+  placingFlag: boolean;
+  /** Range preview before building or upgrading: this tower type at this level on this pad. */
+  preview: { pad: number; type: string; level: number } | null;
+  /** A hall's flag being dragged: the finger, and where the flag would land (null: not allowed there). */
+  drag: { pad: number; x: number; y: number; snap: { x: number; y: number } | null } | null;
+}
+
 export function toWorld(v: View, sx: number, sy: number) {
   return { x: (sx - v.ox) / v.scale, y: (sy - v.oy) / v.scale };
 }
@@ -80,7 +113,7 @@ export class Renderer {
     this.scenery = makeScenery(game);
   }
 
-  draw(game: Game, v: View, dt: number, selectedPad: number | null, placingFlag = false): void {
+  draw(game: Game, v: View, dt: number, o: Overlay): void {
     const ctx = this.ctx;
     ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
     // Grass fills the whole screen, also beyond the map on screens wider or taller than 16:9.
@@ -92,30 +125,35 @@ export class Renderer {
     for (const s of this.scenery) if (s.kind !== 'tree') drawScenery(ctx, s);
 
     game.pads.forEach((p, i) => {
-      if (!game.towers[i]) drawPad(ctx, p.x, p.y, i === selectedPad);
+      if (!game.towers[i]) drawPad(ctx, p.x, p.y, i === o.selected);
     });
 
-    if (selectedPad !== null) {
-      const t = game.towers[selectedPad];
-      if (t) {
-        const spec = game.towerLevel(t.type, t.level)!;
-        const p = game.pads[selectedPad];
-        // Bowmen: how far they shoot. Halls: how far the flag may go (blue).
-        const tint = spec.unit ? '170, 205, 255' : '255, 245, 200';
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, spec.range, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${tint}, ${placingFlag ? 0.2 : 0.12})`;
-        ctx.fill();
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = `rgba(${tint}, 0.7)`;
-        ctx.setLineDash([12, 10]);
-        ctx.stroke();
-        ctx.setLineDash([]);
+    const rangeOf = (type: string, level: number) => game.towerLevel(type, level);
+    if (o.preview) {
+      const spec = rangeOf(o.preview.type, o.preview.level);
+      const p = game.pads[o.preview.pad];
+      if (spec) drawRange(ctx, p.x, p.y, spec.range, !!spec.unit, true);
+    } else {
+      const pad = o.drag?.pad ?? o.selected;
+      const t = pad === null ? null : game.towers[pad];
+      if (t && pad !== null) {
+        const spec = rangeOf(t.type, t.level)!;
+        const p = game.pads[pad];
+        drawRange(ctx, p.x, p.y, spec.range, !!spec.unit, o.placingFlag || !!o.drag);
       }
     }
     game.towers.forEach((t, i) => {
-      if (t?.rally) drawFlag(ctx, t.rally.x, t.rally.y, i === selectedPad);
+      if (t?.rally) drawFlag(ctx, t.rally.x, t.rally.y, i === o.selected && !o.drag, 1);
     });
+    if (o.drag) {
+      if (o.drag.snap) drawFlag(ctx, o.drag.snap.x, o.drag.snap.y, true, 0.75);
+      else drawCross(ctx, o.drag.x, o.drag.y);
+    }
+    // Preview of a new hall: where its flag would go.
+    if (o.preview?.type === 'knights' && !game.towers[o.preview.pad]) {
+      const r = game.defaultRally(o.preview.pad);
+      if (r) drawFlag(ctx, r.x, r.y, true, 0.6);
+    }
 
     // Everything that stands up is drawn back-to-front so lower things overlap higher ones.
     type Item = { y: number; draw: () => void };
@@ -124,6 +162,18 @@ export class Renderer {
     game.towers.forEach((t) => {
       if (t) items.push({ y: game.pads[t.pad].y, draw: () => drawTower(ctx, game, t) });
     });
+    // A see-through tower where one is about to be built.
+    if (o.preview && !game.towers[o.preview.pad]) {
+      const ghost: Tower = { pad: o.preview.pad, type: o.preview.type, level: 0, cooldown: 0, spent: 0, shotAge: 9, rally: null, knights: [] };
+      items.push({
+        y: game.pads[o.preview.pad].y,
+        draw: () => {
+          ctx.globalAlpha = 0.55;
+          drawTower(ctx, game, ghost);
+          ctx.globalAlpha = 1;
+        },
+      });
+    }
     for (const e of game.enemies) items.push({ y: e.y, draw: () => drawEnemy(ctx, e, game.paths[e.path].length) });
     game.towers.forEach((t) => {
       const unit = t && game.towerLevel(t.type, t.level)?.unit;
@@ -387,8 +437,34 @@ function drawHall(ctx: CanvasRenderingContext2D, game: Game, t: Tower): void {
   levelPips(ctx, x, y - h - 12, t.level);
 }
 
-function drawFlag(ctx: CanvasRenderingContext2D, x: number, y: number, big: boolean): void {
+function drawRange(ctx: CanvasRenderingContext2D, x: number, y: number, range: number, hall: boolean, strong: boolean): void {
+  // Bowmen: how far they shoot (warm). Halls: how far the flag may go (blue).
+  const tint = hall ? '170, 205, 255' : '255, 245, 200';
+  ctx.beginPath();
+  ctx.arc(x, y, range, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(${tint}, ${strong ? 0.2 : 0.12})`;
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = `rgba(${tint}, ${strong ? 0.9 : 0.7})`;
+  ctx.setLineDash([12, 10]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawCross(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  ctx.strokeStyle = 'rgba(224, 83, 61, 0.9)';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(x - 12, y - 12);
+  ctx.lineTo(x + 12, y + 12);
+  ctx.moveTo(x + 12, y - 12);
+  ctx.lineTo(x - 12, y + 12);
+  ctx.stroke();
+}
+
+function drawFlag(ctx: CanvasRenderingContext2D, x: number, y: number, big: boolean, alpha: number): void {
   const s = big ? 1.3 : 0.85;
+  ctx.globalAlpha = alpha;
   ctx.fillStyle = 'rgba(20, 30, 10, 0.3)';
   ctx.beginPath();
   ctx.ellipse(x, y, 8 * s, 3.5 * s, 0, 0, Math.PI * 2);
@@ -401,6 +477,7 @@ function drawFlag(ctx: CanvasRenderingContext2D, x: number, y: number, big: bool
   ctx.lineTo(x + 22 * s, y - 28 * s);
   ctx.lineTo(x + 1.5 * s, y - 20 * s);
   ctx.fill();
+  ctx.globalAlpha = 1;
 }
 
 function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: number, time: number): void {

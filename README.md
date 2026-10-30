@@ -22,8 +22,11 @@ If it still shows an older build, wait a few minutes: GitHub Pages caches the pa
 
 - Tap a grey stone spot to build. **Bowmen** shoot arrows; a **Knights' Hall** sends three
   knights onto the road to stop enemies. Tap a building to upgrade or sell it.
-- To move the knights, tap their hall, then **🚩 Move flag**, then tap the road inside the
-  blue circle.
+- Building, upgrading and selling take two taps: the first shows how far the tower reaches,
+  the second (on the ✔) confirms. Tap anywhere else to cancel.
+- To move the knights, drag them (or their flag) to another part of the road. Or tap their
+  hall, then **🚩 Move flag**, then tap the road inside the blue circle.
+- Pinch to zoom in and out; drag the map to look around when zoomed in.
 - Tap **⚔ Start wave 1** when you're ready. Later waves start by themselves; calling them
   early gives bonus gold.
 - Each enemy that reaches the end of the road costs lives. Win with 18+ lives left for 3 stars.

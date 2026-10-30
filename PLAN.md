@@ -80,6 +80,11 @@ Each one is a version the owner can play from the link.
   enemy and fights it, fallen knights return after a few seconds, idle knights heal. Move the
   flag with the 🚩 button, then tap the road inside the blue circle. Build spots moved after
   the owner's first play (3 of them reached almost no road); enemies a bit tougher to match.
+- **0.3.1 ✅** (owner's feedback on 0.3): pinch to zoom (up to 2.5×) and drag to move around;
+  drag knights (or their flag) to move the flag; building, upgrading and selling take two taps:
+  the first shows the range (and a see-through tower), the second confirms, a tap elsewhere
+  cancels. Difficulty stays as it is ("on the hard side", 1 star) until the hero and more
+  towers arrive.
 - **0.4**: Wizard Tower and Catapult; Hexling and Wyrmling.
 - **0.5**: level select with 3 levels; stars saved on the phone.
 - **0.6**: Level Studio: draw a road with a finger, place build spots, set waves, then
@@ -94,6 +99,10 @@ the "copy level as JSON" editor idea.
 
 Not kept: one big HTML file, the Tailwind CDN, 0–1 coordinates, "true" damage, and names and
 wording borrowed from other games.
+
+## Owner's wishes for later
+
+- Knights should look very different (Phase 2 art), not just recoloured shapes.
 
 ## Open questions for the owner
 

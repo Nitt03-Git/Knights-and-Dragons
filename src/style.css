@@ -163,6 +163,12 @@ button.pill:active {
   color: var(--red);
 }
 
+#menu button.armed {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(255, 213, 74, 0.45), 0 3px 10px rgba(0, 0, 0, 0.45);
+  transform: scale(1.1);
+}
+
 #menu button.locked {
   opacity: 0.45;
 }
