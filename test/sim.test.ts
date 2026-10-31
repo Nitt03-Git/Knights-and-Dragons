@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildPath, distanceToPath, pointAt } from '../src/path';
-import { earnedStars, isUnlocked, loadProgress, saveStars, starsToSpend } from '../src/progress';
+import { earnedStars, isUnlocked, loadHeroXp, loadProgress, saveHeroXp, saveStars, starsToSpend } from '../src/progress';
 import { damageAfterDefence, Game, WORLD_H, WORLD_W, type Tower } from '../src/sim';
 import type { HeroAbility } from '../src/types';
 import { BALANCE, LEVELS } from './bot';
@@ -400,5 +400,21 @@ describe('hero experience', () => {
     (g as unknown as { gainXp: (xp: number) => void }).gainXp(1e6);
     expect(g.hero.level).toBe(BALANCE.hero.levels.length + 1);
     expect(g.heroNextXp()).toBeNull();
+  });
+});
+
+describe('hero experience kept between battles', () => {
+  it('a battle starts at the level the saved XP brings, at full health', () => {
+    const xp = BALANCE.hero.levels[2].xp + 5;
+    const g = new Game(LEVELS[0], BALANCE, 1, [], xp);
+    expect(g.hero.level).toBe(4);
+    expect(g.hero.xp).toBe(xp);
+    expect(g.hero.hp).toBe(BALANCE.hero.levels[2].hp);
+    expect(g.events).toEqual([]);
+  });
+
+  it('the hero XP survives having no storage', () => {
+    expect(loadHeroXp()).toBe(0);
+    expect(() => saveHeroXp(100)).not.toThrow();
   });
 });

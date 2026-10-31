@@ -70,3 +70,23 @@ export function buyAbility(a: HeroAbility, hero: HeroSpec): HeroAbility[] {
   }
   return next;
 }
+
+const XP_KEY = 'knights-and-dragons.hero-xp.v1';
+
+/** The hero's experience, kept between battles. */
+export function loadHeroXp(): number {
+  try {
+    const xp = Number(localStorage.getItem(XP_KEY) ?? 0);
+    return Number.isFinite(xp) && xp > 0 ? xp : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function saveHeroXp(xp: number): void {
+  try {
+    localStorage.setItem(XP_KEY, String(Math.floor(xp)));
+  } catch {
+    // Not saved; the XP still counts for this battle.
+  }
+}

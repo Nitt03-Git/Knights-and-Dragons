@@ -122,6 +122,11 @@ Each one is a version the owner can play from the link.
   sword damage and armor, and heal him fully. XP starts again each battle (chosen so levels
   stay balanced; could become permanent later). Level 1 got easier with it (bot: 3 stars
   with 6 towers); levels 2 and 3 barely changed.
+- **0.6.3 ✅** (owner's choice): hero XP is **kept forever** (saved on the phone after every
+  kill, win or lose), so replaying levels makes Roch stronger. **10 levels**, each half the
+  step of the old 5; reaching the old top strength (now level 9) takes 3× the XP (1650).
+  Thresholds 90/180/330/480/720/960/1300/1650/2100. A battle gives roughly 100–250 XP with
+  Roch left where he starts, more when he is moved into the fights.
 - **0.7**: Level Studio: draw a road with a finger, place build spots, set waves, then
   "Copy level" and paste it into the chat so Claude adds it to `data/levels.json`.
 - **Later**: branching upgrades, sound, more levels, then Phase 2 and Phase 3.

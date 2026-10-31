@@ -4,10 +4,15 @@
     "name": "Roch the Mounted Knight",
     "hp": 240, "armor": 0.3, "damage": [10, 15], "cooldown": 0.9, "speed": 150, "regen": 8, "respawn": 20, "holds": 2, "engageRange": 100,
     "levels": [
-      {"xp": 60, "hp": 280, "damage": [12, 18], "armor": 0.32},
-      {"xp": 160, "hp": 320, "damage": [14, 21], "armor": 0.35},
-      {"xp": 320, "hp": 370, "damage": [17, 25], "armor": 0.38},
-      {"xp": 550, "hp": 430, "damage": [20, 30], "armor": 0.4}
+      {"xp": 90, "hp": 260, "damage": [11, 16], "armor": 0.31},
+      {"xp": 180, "hp": 280, "damage": [12, 18], "armor": 0.32},
+      {"xp": 330, "hp": 300, "damage": [13, 20], "armor": 0.335},
+      {"xp": 480, "hp": 320, "damage": [14, 21], "armor": 0.35},
+      {"xp": 720, "hp": 345, "damage": [16, 23], "armor": 0.365},
+      {"xp": 960, "hp": 370, "damage": [17, 25], "armor": 0.38},
+      {"xp": 1300, "hp": 400, "damage": [18, 28], "armor": 0.39},
+      {"xp": 1650, "hp": 430, "damage": [20, 30], "armor": 0.4},
+      {"xp": 2100, "hp": 460, "damage": [22, 32], "armor": 0.41}
     ],
     "rally": {"name": "Rallying Banner", "cost": 2, "radius": 160, "hpBoost": 0.2},
     "stomp": {"name": "Thundering Hooves", "cost": 2, "every": 15, "radius": 90, "damage": 35}

@@ -6,11 +6,11 @@ import '@fontsource/fredoka/latin-700.css';
 import './style.css';
 import { BALANCE, LEVELS } from './data';
 import { fitView, panView, Renderer, toScreen, toWorld, zoomView, type Overlay, type View } from './render';
-import { buyAbility, isUnlocked, loadAbilities, loadProgress, saveStars, starsToSpend } from './progress';
+import { buyAbility, isUnlocked, loadAbilities, loadHeroXp, loadProgress, saveHeroXp, saveStars, starsToSpend } from './progress';
 import { Game, STEP } from './sim';
 import type { HeroAbility } from './types';
 
-const VERSION = '0.6.2';
+const VERSION = '0.6.3';
 
 /** Towers in the build ring, clockwise from top-left. */
 const BUILD_RING: { type: string; icon: string; label: string; angle: number; soon?: string }[] = [
@@ -53,6 +53,8 @@ let placingFlag: number | null = null;
 /** The hero is selected and waits for a tap on where to ride; or is being dragged there. */
 let heroSelected = false;
 let heroDrag: { x: number; y: number } | null = null;
+/** The hero XP last written to the phone; saved again whenever it grows. */
+let savedXp = 0;
 let shownEnd = false;
 let bannerTimer = 0;
 
@@ -139,9 +141,8 @@ function showHero(): void {
     }).join('');
     showCard(
       `<h2>${hero.name}</h2>
-       <p>Tap the hero, then tap where to ride (or drag it there). It holds two enemies at a time and comes back after falling.
-       Each enemy it defeats gives XP (as much as its gold); new levels (up to ${hero.levels.length + 1}) bring more health, power and armor. XP starts again each battle.</p>
-       <p class="spend">★ ${spend} star${spend === 1 ? '' : 's'} to spend</p>
+       <p>Tap him, then tap where to ride (or drag him). Every enemy he defeats gives XP, kept between battles: replaying levels makes him stronger, up to level ${hero.levels.length + 1}.</p>
+       <p class="spend">Level ${heroLevelFor(loadHeroXp())} · ${loadHeroXp()} XP · ★ ${spend} to spend</p>
        <div class="abilities">${rows}</div>`,
       [{ text: 'Back', main: true, onClick: showLevels }],
     );
@@ -159,6 +160,11 @@ function showHero(): void {
     });
   };
   render();
+}
+
+/** The level a given amount of hero XP brings. */
+function heroLevelFor(xp: number): number {
+  return 1 + BALANCE.hero.levels.filter((l) => xp >= l.xp).length;
 }
 
 function showPause(): void {
@@ -191,7 +197,8 @@ function showEnd(): void {
 function startLevel(index: number): void {
   levelIndex = index;
   level = LEVELS[index];
-  game = new Game(level, BALANCE, 1, loadAbilities());
+  game = new Game(level, BALANCE, 1, loadAbilities(), loadHeroXp());
+  savedXp = game.hero.xp;
   renderer = new Renderer(ctx, game);
   view = fitted;
   heroSelected = false;
@@ -592,6 +599,10 @@ function frame(now: number): void {
     if (ev.kind === 'wave') {
       showBanner(`Wave ${ev.wave} of ${game.totalWaves}${ev.bonus ? `<small>+${ev.bonus} gold for calling early</small>` : ''}`);
     }
+  }
+  if (game.hero.xp > savedXp) {
+    savedXp = game.hero.xp;
+    saveHeroXp(savedXp);
   }
   renderer.draw(game, view, paused ? 0 : dt * speed, { selected, placingFlag: placingFlag !== null, preview, drag, heroSelected, heroDrag });
   game.events.length = 0;

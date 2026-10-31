@@ -76,7 +76,7 @@ export interface Hero {
   /** Seconds until the stomp is ready again, and since the last one (for drawing). */
   stompIn: number;
   stompAge: number;
-  /** Experience this battle, and the level it brought (1 = starting level). */
+  /** Experience earned so far (kept between battles), and the level it brought (1 = first). */
   xp: number;
   level: number;
 }
@@ -174,7 +174,7 @@ export class Game {
   readonly hero: Hero;
   readonly abilities: ReadonlySet<HeroAbility>;
 
-  constructor(readonly level: Level, readonly balance: Balance, seed = 1, abilities: HeroAbility[] = []) {
+  constructor(readonly level: Level, readonly balance: Balance, seed = 1, abilities: HeroAbility[] = [], heroXp = 0) {
     this.paths = level.paths.map((p) => buildPath(p.points));
     this.pads = level.pads.map(([x, y]) => ({ x, y }));
     this.towers = level.pads.map(() => null);
@@ -202,6 +202,10 @@ export class Game {
       xp: 0,
       level: 1,
     };
+    // XP is kept between battles: start at the level it already earned, at full health.
+    this.hero.xp = heroXp;
+    while (this.heroNextXp() !== null && this.hero.xp >= this.heroNextXp()!) this.hero.level++;
+    this.hero.hp = this.heroStats().hp;
   }
 
   get rules() {

@@ -32,7 +32,8 @@ If it still shows an older build, wait a few minutes: GitHub Pages caches the pa
 - Pinch to zoom in and out; drag the map to look around when zoomed in.
 - Your **hero**, a knight on a horse: tap it, then tap where it should ride (or drag it
   there). The 🐴 button bottom-left shows its level, health and experience, and also selects
-  it. Every enemy the hero defeats gives experience; new levels make it stronger. Spend the stars you
+  it. Every enemy the hero defeats gives experience, kept between battles; new levels (up
+  to 10) make it stronger, so replaying levels pays off. Spend the stars you
   win on its abilities: **🐴 Hero** on the level screen.
 - Pick a level. Each level opens once you've won the one before; your best stars are kept on
   this phone (clearing Chrome's site data for the game resets them).
@@ -44,7 +45,8 @@ If it still shows an older build, wait a few minutes: GitHub Pages caches the pa
 ## Privacy
 
 The game collects nothing and contacts nothing besides this website (fonts are included).
-It needs no permissions. Your stars are stored only in your phone's browser.
+It needs no permissions. Your stars, hero abilities and hero experience are stored only in
+your phone's browser.
 
 ## Building (for developers)
 

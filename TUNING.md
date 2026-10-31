@@ -55,7 +55,7 @@ far from the hall the flag may go, and `unit` describes the knights:
 | Name | What it does | Now |
 |---|---|---|
 | `name` | Shown on the Hero screen | Roch the Mounted Knight |
-| `hp`, `armor`, `regen`, `respawn`, `speed`, `holds` | As for knights | 240, 0.3, 8, 20, 150, 2 |
+| `hp`, `armor`, `regen`, `respawn`, `speed`, `holds` | As for knights (`hp` and `armor` at level 1) | 240, 0.3, 8, 20, 150, 2 |
 | `damage`, `cooldown` | Its sword blows | [10, 15], 0.9 |
 | `engageRange` | How far from where it stands it rides out to fight | 100 |
 | `rally.cost` / `stomp.cost` | Stars to buy each ability (2 each while testing) | 2 / 2 |
@@ -63,9 +63,10 @@ far from the hall the flag may go, and `unit` describes the knights:
 | `stomp.every`, `stomp.damage`, `stomp.radius` | Thundering Hooves: seconds between stamps, damage, reach | 15, 35, 90 |
 
 **Hero levels** (`hero` → `levels`): the hero earns XP equal to the gold of each enemy it
-defeats itself. Each entry is the next level: `xp` is the total XP needed, then that level's
-`hp`, `damage` and `armor`. Level 1 uses the hero's own numbers above. XP starts at 0 in every
-battle. Now: level 2 at 60 XP, 3 at 160, 4 at 320, 5 at 550.
+defeats itself, and keeps it between battles (saved on the phone). Each entry is the next
+level: `xp` is the total XP needed, then that level's `hp`, `damage` and `armor`. Level 1 uses
+the hero's own numbers above. Now 10 levels: 2 at 90 XP, 3 at 180, 4 at 330, 5 at 480, 6 at 720,
+7 at 960, 8 at 1300, 9 at 1650, 10 at 2100.
 
 Each level in `levels.json` can also set `"heroStart": [x, y]`, where the hero begins.
 
