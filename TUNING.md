@@ -139,7 +139,9 @@ Claude, but you can also edit the file.
 | `bounce` | How high it bobs while walking or flying (0 to 3). |
 | `speed` | How fast legs, wings and sword move (0.3 to 3). Not how fast it walks: that is `speed` in `balance.json`. |
 | `swing` | How far the sword swings; for the Wyrmling, how far the wings flap (0 to 2.5). |
-| `colors` | Colours as `#rrggbb`. Darker shades (stone sides, horse legs, visors) follow on their own. |
+| `colors` | Units: colours as `#rrggbb`. Darker shades (horse legs, visors) follow on their own. |
+| `roof` | Towers: `blue`, `red`, `green`, `yellow` or `purple`. |
+| `stone` | Towers: `sand` or `grey` (not the catapult). |
 
 ## Changing a number yourself on GitHub
 

@@ -12,7 +12,11 @@ export interface Look {
   speed?: number;
   /** How far the sword swings (wings flap, for flyers), 1 = normal. */
   swing?: number;
-  colors: Record<string, string>;
+  /** Units: named colours. */
+  colors?: Record<string, string>;
+  /** Towers (Kenney pictures): roof colour and kind of stone. */
+  roof?: string;
+  stone?: string;
 }
 
 export type Looks = Record<string, Look>;
@@ -29,6 +33,14 @@ export const LOOK_SLIDERS = {
   swing: { label: 'Sword swing', min: 0, max: 2.5, step: 0.1 },
 } as const;
 export type SliderKey = keyof typeof LOOK_SLIDERS;
+
+/** Choices instead of free colours, for towers: the colour sets the pictures were made in. */
+export const LOOK_CHOICES = {
+  roof: { label: 'Roof', options: ['blue', 'red', 'green', 'yellow', 'purple'] },
+  stone: { label: 'Stone', options: ['sand', 'grey'] },
+} as const;
+export type ChoiceKey = keyof typeof LOOK_CHOICES;
+export const CHOICE_KEYS = Object.keys(LOOK_CHOICES) as ChoiceKey[];
 
 /** Names shown in the Look Lab. */
 export const LOOK_NAMES: Record<string, string> = {
@@ -87,9 +99,13 @@ export function mergeLooks(defaults: Looks, changes: unknown): Looks {
       const r = LOOK_SLIDERS[key];
       if (look[key] !== undefined && typeof v === 'number' && Number.isFinite(v)) look[key] = Math.min(r.max, Math.max(r.min, v));
     }
-    for (const name of Object.keys(look.colors)) {
+    for (const name of Object.keys(look.colors ?? {})) {
       const v = c.colors?.[name];
-      if (isColor(v)) look.colors[name] = v.toLowerCase();
+      if (isColor(v)) look.colors![name] = v.toLowerCase();
+    }
+    for (const key of CHOICE_KEYS) {
+      const v = c[key];
+      if (look[key] !== undefined && (LOOK_CHOICES[key].options as readonly string[]).includes(v as string)) look[key] = v;
     }
   }
   return out;
@@ -103,8 +119,9 @@ export function lookChanges(looks: Looks, defaults: Looks = DEFAULT_LOOKS): Reco
     if (!d) continue;
     const c: Partial<Look> = {};
     for (const key of Object.keys(LOOK_SLIDERS) as SliderKey[]) if (look[key] !== d[key]) c[key] = look[key];
+    for (const key of CHOICE_KEYS) if (look[key] !== d[key]) c[key] = look[key];
     const colors: Record<string, string> = {};
-    for (const [name, v] of Object.entries(look.colors)) if (v.toLowerCase() !== d.colors[name]?.toLowerCase()) colors[name] = v;
+    for (const [name, v] of Object.entries(look.colors ?? {})) if (v.toLowerCase() !== d.colors?.[name]?.toLowerCase()) colors[name] = v;
     if (Object.keys(colors).length) c.colors = colors;
     if (Object.keys(c).length) out[id] = c;
   }
@@ -142,8 +159,15 @@ export function setLookNumber(id: string, key: SliderKey, value: number): void {
 
 export function setLookColor(id: string, name: string, value: string): void {
   const look = LOOKS[id];
-  if (!look || !(name in look.colors) || !isColor(value)) return;
+  if (!look?.colors || !(name in look.colors) || !isColor(value)) return;
   look.colors[name] = value.toLowerCase();
+  save();
+}
+
+export function setLookChoice(id: string, key: ChoiceKey, value: string): void {
+  const look = LOOKS[id];
+  if (!look || look[key] === undefined || !(LOOK_CHOICES[key].options as readonly string[]).includes(value)) return;
+  look[key] = value;
   save();
 }
 
@@ -156,9 +180,10 @@ export function resetLooks(id?: string): void {
 /** The looks as they would sit in data/looks.json: one line per unit. */
 export function looksToJson(looks: Looks = LOOKS): string {
   const lines = Object.entries(looks).map(([id, look]) => {
-    const nums = (Object.keys(LOOK_SLIDERS) as SliderKey[]).filter((k) => look[k] !== undefined).map((k) => `"${k}": ${look[k]}`);
-    const colors = Object.entries(look.colors).map(([n, c]) => `"${n}": "${c}"`).join(', ');
-    return `  "${id}": { ${[...nums, `"colors": { ${colors} }`].join(', ')} }`;
+    const parts = (Object.keys(LOOK_SLIDERS) as SliderKey[]).filter((k) => look[k] !== undefined).map((k) => `"${k}": ${look[k]}`);
+    for (const k of CHOICE_KEYS) if (look[k] !== undefined) parts.push(`"${k}": "${look[k]}"`);
+    if (look.colors) parts.push(`"colors": { ${Object.entries(look.colors).map(([n, c]) => `"${n}": "${c}"`).join(', ')} }`);
+    return `  "${id}": { ${parts.join(', ')} }`;
   });
   return `{\n${lines.join(',\n')}\n}`;
 }
@@ -167,6 +192,7 @@ export function looksToJson(looks: Looks = LOOKS): string {
 export function changesToJson(looks: Looks = LOOKS): string {
   const lines = Object.entries(lookChanges(looks)).map(([id, c]) => {
     const parts = (Object.keys(LOOK_SLIDERS) as SliderKey[]).filter((k) => c[k] !== undefined).map((k) => `"${k}": ${c[k]}`);
+    for (const k of CHOICE_KEYS) if (c[k] !== undefined) parts.push(`"${k}": "${c[k]}"`);
     if (c.colors) parts.push(`"colors": { ${Object.entries(c.colors).map(([n, v]) => `"${n}": "${v}"`).join(', ')} }`);
     return `  "${id}": { ${parts.join(', ')} }`;
   });
@@ -187,7 +213,14 @@ export function rgb(hex: string): string {
   return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
 }
 
+const PLAIN: Look = { size: 1, bounce: 1, speed: 1, swing: 1, colors: { body: '#999999', belly: '#cccccc' } };
+
 /** A unit's look, or a plain grey one for something without a look yet. */
 export function lookOf(id: string): Look {
-  return LOOKS[id] ?? { size: 1, bounce: 1, speed: 1, swing: 1, colors: { body: '#999999', belly: '#cccccc' } };
+  return LOOKS[id] ?? PLAIN;
+}
+
+/** A unit's colours (a tower has none: it uses a roof and stone instead). */
+export function colorsOf(id: string): Record<string, string> {
+  return lookOf(id).colors ?? PLAIN.colors!;
 }

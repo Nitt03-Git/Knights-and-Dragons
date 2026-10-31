@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { changesToJson, DEFAULT_LOOKS, lookChanges, LOOK_SLIDERS, looksToJson, mergeLooks, shade, type SliderKey } from '../src/looks';
+import { CHOICE_KEYS, changesToJson, DEFAULT_LOOKS, LOOK_CHOICES, lookChanges, LOOK_SLIDERS, looksToJson, mergeLooks, shade, type SliderKey } from '../src/looks';
+import { hasSprite } from '../src/sprites';
 import { SPOTS } from '../src/lab';
 import { blankLevel, checkLevel, levelToJson, strokeToRoad } from '../src/studio';
 import { buildPath, distanceToPath, pointAt } from '../src/path';
@@ -605,7 +606,8 @@ describe('looks', () => {
         expect(v).toBeGreaterThanOrEqual(LOOK_SLIDERS[key].min);
         expect(v).toBeLessThanOrEqual(LOOK_SLIDERS[key].max);
       }
-      for (const c of Object.values(look.colors)) expect(c).toMatch(/^#[0-9a-f]{6}$/);
+      for (const c of Object.values(look.colors ?? {})) expect(c).toMatch(/^#[0-9a-f]{6}$/);
+      for (const key of CHOICE_KEYS) if (look[key] !== undefined) expect(LOOK_CHOICES[key].options).toContain(look[key]);
     }
   });
 
@@ -613,15 +615,20 @@ describe('looks', () => {
     const merged = mergeLooks(DEFAULT_LOOKS, {
       hero: { size: 9, colors: { horse: '#FFFFFF', plume: 'red', wings: '#000000' } },
       kobold: { swing: 2, bounce: 'high' },
+      archer: { roof: 'pink', stone: 'grey' },
+      knight: { roof: 'red' },
       dragon: { size: 1.2 },
     });
     expect(merged.hero.size).toBe(LOOK_SLIDERS.size.max);
-    expect(merged.hero.colors.horse).toBe('#ffffff');
-    expect(merged.hero.colors.plume).toBe(DEFAULT_LOOKS.hero.colors.plume);
-    expect(merged.hero.colors.wings).toBeUndefined();
+    expect(merged.hero.colors!.horse).toBe('#ffffff');
+    expect(merged.hero.colors!.plume).toBe(DEFAULT_LOOKS.hero.colors!.plume);
+    expect(merged.hero.colors!.wings).toBeUndefined();
     expect(merged.kobold.swing).toBeUndefined();
     expect(merged.kobold.bounce).toBe(DEFAULT_LOOKS.kobold.bounce);
     expect(merged.dragon).toBeUndefined();
+    expect(merged.archer.roof).toBe(DEFAULT_LOOKS.archer.roof);
+    expect(merged.archer.stone).toBe('grey');
+    expect(merged.knight.roof).toBeUndefined();
     expect(mergeLooks(DEFAULT_LOOKS, 'junk')).toEqual(DEFAULT_LOOKS);
   });
 
@@ -629,14 +636,25 @@ describe('looks', () => {
     expect(lookChanges(DEFAULT_LOOKS)).toEqual({});
     const changed = structuredClone(DEFAULT_LOOKS);
     changed.troll.bounce = 2.5;
-    changed.knight.colors.tabard = '#aa0000';
+    changed.knight.colors!.tabard = '#aa0000';
+    changed.wizard.roof = 'yellow';
     const json = changesToJson(changed);
-    expect(JSON.parse(json)).toEqual({ troll: { bounce: 2.5 }, knight: { colors: { tabard: '#aa0000' } } });
+    expect(JSON.parse(json)).toEqual({ troll: { bounce: 2.5 }, knight: { colors: { tabard: '#aa0000' } }, wizard: { roof: 'yellow' } });
     expect(mergeLooks(DEFAULT_LOOKS, JSON.parse(json))).toEqual(changed);
   });
 
   it('writes looks in the same shape as data/looks.json', () => {
     expect(JSON.parse(looksToJson(DEFAULT_LOOKS))).toEqual(DEFAULT_LOOKS);
+  });
+
+  it('has a picture for every tower level, roof and stone, and every catapult arm step', () => {
+    for (const type of ['archer', 'knights', 'wizard']) {
+      for (const level of [0, 1, 2]) for (const roof of LOOK_CHOICES.roof.options) for (const stone of LOOK_CHOICES.stone.options) {
+        expect(hasSprite(`${type}-${level}-${roof}-${stone}`), `${type}-${level}-${roof}-${stone}`).toBe(true);
+      }
+    }
+    for (const roof of LOOK_CHOICES.roof.options) for (const f of [0, 1, 2, 3, 4]) expect(hasSprite(`catapult-${f}-${roof}`)).toBe(true);
+    for (const level of BALANCE.towers.archer.levels.keys()) expect(level).toBeLessThan(3);
   });
 
   it('shades colours darker and lighter', () => {

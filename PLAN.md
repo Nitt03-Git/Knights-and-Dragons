@@ -22,7 +22,9 @@ Other games in the genre are a reference for *feel* only.
   and with a bot player, and the owner plays and gives feedback.
 - Mechanics first, art later:
   - **Phase 1 (now):** rules, units, levels and balance, drawn with simple shapes.
-  - **Phase 2:** real art per tower, enemy and hero (only `src/render.ts` changes).
+  - **Phase 2 (started 0.10):** real art per tower, enemy and hero (only `src/render.ts`
+    changes). Towers and trees: Kenney's Castle Kit (CC0). Knights, hero and enemies: the owner
+    is looking for a pack.
   - **Phase 3:** a painted background per level, drawn on the level's 1600×900 map.
 
 ## Decisions (what changed from the first spec, and why)
@@ -160,7 +162,16 @@ Each one is a version the owner can play from the link.
   1–3, close-up), sliders for size, bounce, speed and sword swing / wing flap, colour pickers.
   Changes are kept on the phone and used by the game there; Copy gives only the changes, to
   paste in the chat. Owner is also looking at Kenney.nl art packs for Phase 2 (Castle Kit).
-- **Later**: branching upgrades, sound, more levels, then Phase 2 and Phase 3.
+- **0.10 ✅**: **Kenney towers** (Phase 2 starts). The owner uploaded Kenney's Castle Kit (3D,
+  CC0) to the chat; it is kept in `art/castle-kit`. `npm run sprites` (`tools/make-sprites.mjs`,
+  pieces in `tools/sprites/recipes.ts`) renders the models with three.js in the preinstalled
+  Chromium, from the game's angle, into `public/sprites/*.png` and `src/sprites.json`. Each tower
+  has 3 levels (taller and grander), 5 roof colours (purple made from Kenney's blue) and sand or
+  grey stone; the catapult's arm is thrown in 5 steps. Trees are Kenney's pines. The Look Lab
+  offers Roof and Stone for towers instead of colour pickers. Units are still drawn shapes.
+- **Next**: art for knights, the hero and enemies once the owner has found a pack (2D
+  top-down or isometric with walk and attack frames fits best).
+- **Later**: branching upgrades, sound, more levels, Phase 3.
 
 ## From the Gemini prototype
 

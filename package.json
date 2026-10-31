@@ -1,18 +1,21 @@
 {
   "name": "knights-and-dragons",
   "private": true,
-  "version": "0.9.0",
+  "version": "0.10.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "check": "tsc --noEmit && vitest run",
-    "balance": "BALANCE=1 vitest run test/balance.test.ts --silent=false"
+    "balance": "BALANCE=1 vitest run test/balance.test.ts --silent=false",
+    "sprites": "node tools/make-sprites.mjs"
   },
   "devDependencies": {
     "@fontsource/cinzel": "^5.3.0",
     "@fontsource/fredoka": "^5.3.0",
+    "@types/three": "0.186.0",
+    "three": "0.186.1",
     "typescript": "7.0.2",
     "vite": "8.3.5",
     "vitest": "5.0.5"

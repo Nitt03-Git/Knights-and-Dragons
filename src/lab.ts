@@ -2,8 +2,8 @@
 // they look. Changes are kept on the phone and used by the game there; Copy gives the looks as
 // JSON to paste in the chat (Claude then puts them in data/looks.json for everyone).
 import { BALANCE } from './data';
-import { changesToJson, COLOR_NAMES, DEFAULT_LOOKS, LOOK_NAMES, LOOK_SLIDERS, LOOKS, lookChanges, resetLooks, setLookColor, setLookNumber, sliderLabel, type SliderKey } from './looks';
-import { drawEnemy, drawHero, drawKnight, drawTower } from './render';
+import { CHOICE_KEYS, changesToJson, COLOR_NAMES, DEFAULT_LOOKS, LOOK_CHOICES, LOOK_NAMES, LOOK_SLIDERS, LOOKS, lookChanges, resetLooks, setLookChoice, setLookColor, setLookNumber, sliderLabel, type ChoiceKey, type SliderKey } from './looks';
+import { drawEnemy, drawHero, drawKnight, drawTower, preloadPictures } from './render';
 import type { Enemy, Hero, Knight } from './sim';
 
 export type Pose = 'walk' | 'fight' | 'hurt' | 'still';
@@ -224,16 +224,24 @@ export class Lab {
           <input type="range" min="${r.min}" max="${r.max}" step="${r.step}" value="${v}" data-num="${k}">
           <span class="val">${v.toFixed(2)}×</span></label>`;
       }).join('');
-    const colors = Object.entries(look.colors).map(([name, c]) => {
-      const mark = c !== DEFAULT_LOOKS[id].colors[name] ? ' changed' : '';
+    const colors = Object.entries(look.colors ?? {}).map(([name, c]) => {
+      const mark = c !== DEFAULT_LOOKS[id].colors?.[name] ? ' changed' : '';
       return `<label class="color${mark}"><input type="color" value="${c}" data-color="${name}"><span>${COLOR_NAMES[name] ?? name}</span></label>`;
+    }).join('');
+    // Towers: roof colour and stone, the colour sets their pictures come in.
+    const choices = CHOICE_KEYS.filter((k) => look[k] !== undefined).map((k) => {
+      const mark = look[k] !== DEFAULT_LOOKS[id][k] ? ' changed' : '';
+      const pills = LOOK_CHOICES[k].options
+        .map((o) => `<button class="pill small${look[k] === o ? ' on' : ''}" data-choice="${k}" data-value="${o}">${o}</button>`).join('');
+      return `<div class="row choice${mark}"><span class="lbl">${LOOK_CHOICES[k].label}</span>${pills}</div>`;
     }).join('');
     this.panel.innerHTML = `
       <select class="unit">${options}</select>
       <div class="row poses">${poseRow}</div>
       ${levelRow}
       ${sliders}
-      <div class="colors">${colors}</div>
+      ${choices}
+      ${colors ? `<div class="colors">${colors}</div>` : ''}
       <button class="pill small reset" ${changed ? '' : 'disabled'}>↺ Back to the game's look</button>
       <p class="note">Changes show in the game on this phone. Tap 📋 Copy and paste it to Claude to make them everyone's.</p>`;
     const p = this.panel;
@@ -262,12 +270,17 @@ export class Lab {
       inp.oninput = () => {
         const name = inp.dataset.color!;
         setLookColor(id, name, inp.value);
-        inp.parentElement!.classList.toggle('changed', LOOKS[id].colors[name] !== DEFAULT_LOOKS[id].colors[name]);
+        inp.parentElement!.classList.toggle('changed', LOOKS[id].colors?.[name] !== DEFAULT_LOOKS[id].colors?.[name]);
         p.querySelector<HTMLButtonElement>('.reset')!.disabled = !lookChanges({ [id]: LOOKS[id] })[id];
       };
       // Let go: redraw the panel, so the unit list shows which ones are changed.
       inp.onchange = () => this.renderPanel();
     });
+    p.querySelectorAll<HTMLButtonElement>('[data-choice]').forEach((b) => (b.onclick = () => {
+      setLookChoice(id, b.dataset.choice as ChoiceKey, b.dataset.value!);
+      preloadPictures();
+      this.renderPanel();
+    }));
     p.querySelector<HTMLButtonElement>('.reset')!.onclick = () => {
       resetLooks(id);
       this.renderPanel();

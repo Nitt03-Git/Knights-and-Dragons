@@ -80,6 +80,11 @@ The game collects nothing and contacts nothing besides this website (fonts are i
 It needs no permissions. Your stars, upgrades, hero experience, Studio draft and Look Lab
 changes are stored only in your phone's browser.
 
+## Art
+
+Towers and trees: [Castle Kit](https://kenney.nl/assets/castle-kit) by Kenney (CC0, free to use),
+in `art/castle-kit`. `npm run sprites` turns the 3D models into the game's pictures.
+
 ## Building (for developers)
 
 ```
@@ -87,6 +92,7 @@ npm install
 npm run dev      # local server
 npm run check    # type check and tests (includes a bot that plays level 1)
 npm run build    # production build in dist/
+npm run sprites  # remake public/sprites from art/castle-kit (needs Playwright's Chromium)
 ```
 
 Plan and milestones: [PLAN.md](PLAN.md). Every gameplay number and how to change it: [TUNING.md](TUNING.md).

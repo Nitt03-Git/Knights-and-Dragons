@@ -1,6 +1,7 @@
 // Draws the game with simple shapes. Phase 2 replaces these draw functions with real art;
 // nothing in here changes the game.
-import { lookOf, rgb, shade, type Look } from './looks';
+import { colorsOf, lookOf, rgb, shade, type Look } from './looks';
+import { drawSprite, preload, sprite } from './sprites';
 import { makeRng } from './rng';
 import { FLY_HEIGHT, WORLD_H, WORLD_W, type Enemy, type Game, type Hero, type Knight, type Projectile, type Strike, type Tower } from './sim';
 
@@ -117,6 +118,7 @@ export class Renderer {
 
   constructor(private ctx: CanvasRenderingContext2D, game: Game) {
     this.scenery = makeScenery(game);
+    preloadPictures();
   }
 
   draw(game: Game, v: View, dt: number, o: Overlay): void {
@@ -379,7 +381,14 @@ function drawScenery(ctx: CanvasRenderingContext2D, s: Scenery): void {
       ctx.ellipse(s.x - 2, s.y - 2, s.size, s.size * 0.65, 0, 0, Math.PI * 2);
       ctx.fill();
       break;
-    case 'tree':
+    case 'tree': {
+      // Kenney's pine trees, big and small; drawn shapes until the pictures have loaded.
+      const pic = s.size > 33 ? 'tree-large' : 'tree-small';
+      if (sprite(pic)) {
+        shadow(ctx, s.x, s.y, s.size * 0.7);
+        drawSprite(ctx, pic, s.x, s.y);
+        break;
+      }
       shadow(ctx, s.x, s.y, s.size * 0.9);
       ctx.fillStyle = '#6b4423';
       ctx.fillRect(s.x - 4, s.y - 18, 8, 18);
@@ -392,6 +401,7 @@ function drawScenery(ctx: CanvasRenderingContext2D, s: Scenery): void {
       ctx.arc(s.x - s.size * 0.25, s.y - 22 - s.size * 0.75, s.size * 0.6, 0, Math.PI * 2);
       ctx.fill();
       break;
+    }
   }
 }
 
@@ -440,7 +450,7 @@ function drawProjectile(ctx: CanvasRenderingContext2D, p: Projectile): void {
     return;
   }
   if (p.kind === 'bolt') {
-    const orb = lookOf('wizard').colors.orb;
+    const orb = towerColors(lookOf('wizard')).orb;
     const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 16);
     glow.addColorStop(0, `rgba(${rgb(shade(orb, 0.85))}, 1)`);
     glow.addColorStop(0.35, `rgba(${rgb(orb)}, 0.9)`);
@@ -484,8 +494,10 @@ function drawProjectile(ctx: CanvasRenderingContext2D, p: Projectile): void {
 }
 
 type TowerLook = Pick<Tower, 'type' | 'level' | 'shotAge'>;
+/** A tower's look with its colours worked out, for the drawn shapes. */
+type TowerDraw = Look & { colors: Record<string, string> };
 
-function drawWizardTower(ctx: CanvasRenderingContext2D, t: TowerLook, x: number, y: number, look: Look): void {
+function drawWizardTower(ctx: CanvasRenderingContext2D, t: TowerLook, x: number, y: number, look: TowerDraw): void {
   shadow(ctx, x, y + 4, 36);
   const orb = look.colors.orb;
   const w = 40;
@@ -509,21 +521,25 @@ function drawWizardTower(ctx: CanvasRenderingContext2D, t: TowerLook, x: number,
   ctx.lineTo(x + w / 2 + 8, y - h);
   ctx.closePath();
   ctx.fill();
-  // Glowing orb on top: brighter just after a shot
+  drawOrb(ctx, t, x, y - h - 60, orb);
+  levelPips(ctx, x, y - 12, t.level);
+}
+
+/** The wizard's glowing orb above the roof: brighter just after a shot. */
+function drawOrb(ctx: CanvasRenderingContext2D, t: TowerLook, x: number, y: number, orb: string): void {
   const flash = t.shotAge < 0.25 ? 1 - t.shotAge / 0.25 : 0;
   const r = 7 + flash * 4;
-  const glow = ctx.createRadialGradient(x, y - h - 60, 0, x, y - h - 60, r * 2.4);
+  const glow = ctx.createRadialGradient(x, y, 0, x, y, r * 2.4);
   glow.addColorStop(0, `rgba(${rgb(shade(orb, 0.85))}, 1)`);
   glow.addColorStop(0.4, `rgba(${rgb(orb)}, ${0.7 + flash * 0.3})`);
   glow.addColorStop(1, `rgba(${rgb(shade(orb, -0.3))}, 0)`);
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(x, y - h - 60, r * 2.4, 0, Math.PI * 2);
+  ctx.arc(x, y, r * 2.4, 0, Math.PI * 2);
   ctx.fill();
-  levelPips(ctx, x, y - 12, t.level);
 }
 
-function drawCatapult(ctx: CanvasRenderingContext2D, t: TowerLook, x: number, y: number, look: Look, cooldown: number): void {
+function drawCatapult(ctx: CanvasRenderingContext2D, t: TowerLook, x: number, y: number, look: TowerDraw, cooldown: number): void {
   shadow(ctx, x, y + 4, 44);
   // Stone platform
   ctx.fillStyle = shade(look.colors.stone, -0.22);
@@ -569,20 +585,55 @@ function towerAt(ctx: CanvasRenderingContext2D, game: Game, t: Tower): void {
 }
 
 /** A tower standing at (x, y), at the size and in the colours of its look. */
-export function drawTower(ctx: CanvasRenderingContext2D, t: TowerLook, x: number, y: number, cooldown: number): void {
+const ROOF_HEX: Record<string, string> = { blue: '#4a5fb8', red: '#c8463a', green: '#2f8f5a', yellow: '#e6a83a', purple: '#8a4fc0' };
+const STONE_HEX: Record<string, string> = { sand: '#dcc7a4', grey: '#a3a8ba' };
+
+/** A tower's colours, from its roof and stone: for the drawn shapes and the wizard's magic. */
+function towerColors(look: Look): Record<string, string> {
+  const roof = ROOF_HEX[look.roof ?? 'blue'] ?? ROOF_HEX.blue;
+  return { roof, stone: STONE_HEX[look.stone ?? 'sand'] ?? STONE_HEX.sand, banner: C.gold, orb: shade(roof, 0.35), wood: '#a0623a' };
+}
+
+/** The picture's name for a tower: by level, roof and stone; the catapult by how far its arm is thrown. */
+export function towerSprite(t: TowerLook, cooldown: number): string {
   const look = lookOf(t.type);
+  if (t.type === 'catapult') {
+    // Thrown right after a shot, then slowly wound back.
+    const back = Math.min(1, t.shotAge / (cooldown * 0.6));
+    return `catapult-${Math.round((1 - back) * 4)}-${look.roof}`;
+  }
+  return `${t.type}-${t.level}-${look.roof}-${look.stone}`;
+}
+
+/** Starts loading the pictures the game shows: towers as they look now, and trees. */
+export function preloadPictures(): void {
+  const names = ['tree-large', 'tree-small'];
+  for (const type of ['archer', 'knights', 'wizard']) for (const level of [0, 1, 2]) names.push(towerSprite({ type, level, shotAge: 9 }, 1));
+  for (let f = 0; f <= 4; f++) names.push(`catapult-${f}-${lookOf('catapult').roof}`);
+  preload(names);
+}
+
+export function drawTower(ctx: CanvasRenderingContext2D, t: TowerLook, x: number, y: number, cooldown: number): void {
+  const base = lookOf(t.type);
+  const look = { ...base, colors: towerColors(base) };
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(look.size, look.size);
   ctx.translate(-x, -y);
-  if (t.type === 'knights') drawHall(ctx, t, x, y, look);
+  const name = towerSprite(t, cooldown);
+  if (sprite(name)) shadow(ctx, x, y + 4, 40);
+  const pic = drawSprite(ctx, name, x, y);
+  if (pic) {
+    if (t.type === 'wizard') drawOrb(ctx, t, x, y - pic.ay - 10, look.colors.orb);
+    levelPips(ctx, x, y + 16, t.level);
+  } else if (t.type === 'knights') drawHall(ctx, t, x, y, look);
   else if (t.type === 'wizard') drawWizardTower(ctx, t, x, y, look);
   else if (t.type === 'catapult') drawCatapult(ctx, t, x, y, look, cooldown);
   else drawArcherTower(ctx, t, x, y, look);
   ctx.restore();
 }
 
-function drawArcherTower(ctx: CanvasRenderingContext2D, t: TowerLook, x: number, y: number, look: Look): void {
+function drawArcherTower(ctx: CanvasRenderingContext2D, t: TowerLook, x: number, y: number, look: TowerDraw): void {
   const stoneDark = shade(look.colors.stone, -0.22);
   shadow(ctx, x, y + 4, 40);
   const recoil = t.shotAge < 0.1 ? 2 : 0;
@@ -624,7 +675,7 @@ function levelPips(ctx: CanvasRenderingContext2D, x: number, y: number, level: n
   }
 }
 
-function drawHall(ctx: CanvasRenderingContext2D, t: TowerLook, x: number, y: number, look: Look): void {
+function drawHall(ctx: CanvasRenderingContext2D, t: TowerLook, x: number, y: number, look: TowerDraw): void {
   shadow(ctx, x, y + 4, 44);
   const w = 70;
   const h = 34 + t.level * 5;
@@ -695,7 +746,7 @@ function drawFlag(ctx: CanvasRenderingContext2D, x: number, y: number, big: bool
   ctx.fill();
   ctx.fillStyle = '#5b3a1e';
   ctx.fillRect(x - 1.5 * s, y - 34 * s, 3 * s, 34 * s);
-  ctx.fillStyle = lookOf('knight').colors.tabard;
+  ctx.fillStyle = colorsOf('knight').tabard;
   ctx.beginPath();
   ctx.moveTo(x + 1.5 * s, y - 34 * s);
   ctx.lineTo(x + 22 * s, y - 28 * s);
@@ -760,7 +811,7 @@ function scaleAround(ctx: CanvasRenderingContext2D, x: number, y: number, size: 
 /** The hero: a knight on a horse, facing `facing` (1 right, -1 left). */
 export function drawHero(ctx: CanvasRenderingContext2D, h: Hero, maxHp: number, time: number, facing: number): void {
   const look = lookOf('hero');
-  const col = look.colors;
+  const col = look.colors ?? colorsOf('');
   const speed = look.speed ?? 1;
   const moving = h.state === 'walking';
   const gallop = moving ? Math.sin(time * 16 * speed) : 0;
@@ -876,7 +927,7 @@ export function drawHero(ctx: CanvasRenderingContext2D, h: Hero, maxHp: number, 
 /** A knight from a hall, or a Reinforcement (`lookId` 'soldier'). */
 export function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: number, time: number, rallied: boolean, lookId = 'knight'): void {
   const look = lookOf(lookId);
-  const col = look.colors;
+  const col = look.colors ?? colorsOf('');
   const speed = look.speed ?? 1;
   if (rallied) {
     // Inside the hero's Rallying Banner: a gold glow under the feet.
@@ -972,8 +1023,8 @@ export function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, roadLength: n
   const bob = (flying ? Math.sin(step / 14) * 4 : Math.abs(Math.sin(step / 9)) * 3) * (look.bounce ?? 1);
   shadow(ctx, e.x, e.y, flying ? r * 0.7 : r);
   const cy = e.y - r - bob - (flying ? FLY_HEIGHT : 0);
-  const body = look.colors.body;
-  const belly = look.colors.belly;
+  const body = colorsOf(e.type).body;
+  const belly = colorsOf(e.type).belly;
   if (flying) {
     // Flapping wings behind the body
     const flap = Math.sin(step / 6) * 0.6 * (look.swing ?? 1);
