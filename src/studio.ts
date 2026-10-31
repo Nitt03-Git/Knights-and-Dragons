@@ -42,11 +42,43 @@ export function blankLevel(): Level {
   };
 }
 
+const inMap = ([x, y]: Point) => x >= 0 && x <= WORLD_W && y >= 0 && y <= WORLD_H;
+
+/** Where the line from `inside` towards `outside` crosses the map's edge. */
+function edgeCrossing(inside: Point, outside: Point): Point {
+  const [px, py] = inside;
+  const dx = outside[0] - px;
+  const dy = outside[1] - py;
+  let t = 1;
+  if (px + dx < 0) t = Math.min(t, -px / dx);
+  if (px + dx > WORLD_W) t = Math.min(t, (WORLD_W - px) / dx);
+  if (py + dy < 0) t = Math.min(t, -py / dy);
+  if (py + dy > WORLD_H) t = Math.min(t, (WORLD_H - py) / dy);
+  return [px + dx * t, py + dy * t];
+}
+
+/**
+ * Keeps the part of a stroke that is on the map. A finger that starts or ends beside the map
+ * (phones show some ground around it) is cut at the edge, so the road doesn't double back.
+ */
+export function clipToMap(stroke: Point[]): Point[] {
+  const first = stroke.findIndex(inMap);
+  if (first < 0) return [];
+  let last = stroke.length - 1;
+  while (!inMap(stroke[last])) last--;
+  const clamp = ([x, y]: Point): Point => [Math.min(WORLD_W, Math.max(0, x)), Math.min(WORLD_H, Math.max(0, y))];
+  const pts = stroke.slice(first, last + 1).map(clamp);
+  if (first > 0) pts.unshift(edgeCrossing(stroke[first], stroke[first - 1]));
+  if (last < stroke.length - 1) pts.push(edgeCrossing(stroke[last], stroke[last + 1]));
+  return pts;
+}
+
 /**
  * Turns a finger stroke (world points, in walking order) into road control points: one point
  * every ~50 units, and ends near the map's edge pushed off the map so enemies walk in and out.
  */
-export function strokeToRoad(stroke: Point[]): Point[] {
+export function strokeToRoad(drawn: Point[]): Point[] {
+  const stroke = clipToMap(drawn);
   if (stroke.length < 2) return stroke;
   const pts: Point[] = [stroke[0]];
   let run = 0;
@@ -345,7 +377,8 @@ export class Studio {
       this.stroke = null;
       if (tap) return this.removeRoadAt(x, y);
       if (!stroke) return;
-      const length = stroke.slice(1).reduce((n, p, i) => n + Math.hypot(p[0] - stroke[i][0], p[1] - stroke[i][1]), 0);
+      const onMap = clipToMap(stroke);
+      const length = onMap.slice(1).reduce((n, p, i) => n + Math.hypot(p[0] - onMap[i][0], p[1] - onMap[i][1]), 0);
       if (length < 250) return this.setHint('That road is too short: draw a longer one.');
       if (this.draft.paths.length >= MAX_ROADS) return this.setHint(`At most ${MAX_ROADS} roads: tap one to remove it first.`);
       this.change(() => this.draft.paths.push({ points: strokeToRoad(stroke) }));

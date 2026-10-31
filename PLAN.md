@@ -147,6 +147,10 @@ Each one is a version the owner can play from the link.
   level rules), edit name, start gold and waves, start from blank or a copy of a level, Undo,
   Test (plays the draft; no stars or XP), Copy (JSON for `data/levels.json`). Draft kept on the
   phone.
+- **0.8.1 ✅**: owner's first studio level **X-Road** (level 4: two roads that cross, 5 waves).
+  Changed with the bot: start gold 290 → 380 and the four trolls of wave 5 spaced out (they
+  came all at once); the bot then wins with all 8 spots, on 1 star. Studio fix: a finger that
+  starts or ends beside the map is cut at the edge, so roads no longer double back at the ends.
 - **0.9**: **Look Lab**: every unit animating side by side with sliders (size, bounce, swing
   speed, colours); "Copy" the settings to paste in the chat. Owner is also looking at
   Kenney.nl art packs for Phase 2.
@@ -167,6 +171,6 @@ wording borrowed from other games.
 
 ## Open questions for the owner
 
-- Stars: upgrades cost far more than 3 levels can give (prices kept for now; test stars meanwhile).
-- Ability prices after testing (planned 5 ★ and 10 ★; 3 levels give at most 9 ★).
+- Stars: upgrades cost far more than the levels can give (4 levels: 12 ★) (prices kept for now; test stars meanwhile).
+- Ability prices after testing (planned 5 ★ and 10 ★; 4 levels give at most 12 ★).
 - How many levels for a first "complete" version?

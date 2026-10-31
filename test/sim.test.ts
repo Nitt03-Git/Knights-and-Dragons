@@ -54,6 +54,17 @@ describe('levels', () => {
       });
     });
 
+    it(`${level.id}: roads only leave the map at their two ends`, () => {
+      for (const path of level.paths) {
+        for (const [x, y] of path.points.slice(1, -1)) {
+          expect(x).toBeGreaterThanOrEqual(0);
+          expect(x).toBeLessThanOrEqual(WORLD_W);
+          expect(y).toBeGreaterThanOrEqual(0);
+          expect(y).toBeLessThanOrEqual(WORLD_H);
+        }
+      }
+    });
+
     it(`${level.id}: only uses known enemies`, () => {
       for (const w of level.waves) for (const gr of w.groups) expect(BALANCE.enemies[gr.enemy]).toBeDefined();
     });
@@ -538,6 +549,18 @@ describe('level studio', () => {
     expect(road[road.length - 1][0]).toBeGreaterThan(WORLD_W);
     expect(road.length).toBeLessThan(stroke.length / 3);
     expect(road.every(([x, y]) => Number.isInteger(x) && Number.isInteger(y))).toBe(true);
+  });
+
+  it('cuts a stroke that starts or ends beside the map at the edge, so the road never doubles back', () => {
+    const stroke: [number, number][] = [];
+    for (let x = -360; x <= 2000; x += 20) stroke.push([x, 300 + x * 0.2]);
+    const road = strokeToRoad(stroke);
+    expect(road[0]).toEqual([-140, 300]);
+    expect(road[1]).toEqual([0, 300]);
+    expect(road.at(-1)).toEqual([WORLD_W + 140, 620]);
+    expect(road.at(-2)).toEqual([WORLD_W, 620]);
+    const xs = road.map(([x]) => x);
+    expect(xs.every((x, i) => i === 0 || x > xs[i - 1])).toBe(true);
   });
 
   it('leaves ends in the middle of the map where they are', () => {
