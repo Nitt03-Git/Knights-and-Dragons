@@ -169,8 +169,14 @@ Each one is a version the owner can play from the link.
   has 3 levels (taller and grander), 5 roof colours (purple made from Kenney's blue) and sand or
   grey stone; the catapult's arm is thrown in 5 steps. Trees are Kenney's pines. The Look Lab
   offers Roof and Stone for towers instead of colour pickers. Units are still drawn shapes.
-- **Next**: art for knights, the hero and enemies once the owner has found a pack (2D
-  top-down or isometric with walk and attack frames fits best).
+- **0.11 ✅**: **Quaternius knights.** The owner uploaded the Knight Pack (FBX, CC0; in
+  `art/knight-pack`). `npm run sprites` renders the animated knight from the game's angle into
+  strips of frames: idle (sword ready), walk, fight (jumping sword attack) and death, plus a
+  mask of the armour so the game tints it (knights blue, Reinforcements green, Look Lab
+  "Armor"). Knights have the visored helmet and long sword, Reinforcements another helmet and
+  the short sword. They face the enemy they fight, flash white when hit, and fallen knights
+  lie on the road a moment. Look Lab: Fall pose. Roch is still drawn (the pack has no horse).
+- **Next**: enemies (the owner is looking for a pack) and Roch.
 - **Later**: branching upgrades, sound, more levels, Phase 3.
 
 ## From the Gemini prototype

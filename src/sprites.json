@@ -117,5 +117,13 @@
   "tree-large":{"w":50.7,"h":87.7,"ax":25.2,"ay":73.1},
   "tree-small":{"w":42.3,"h":67.3,"ax":21.1,"ay":55},
   "rocks-large":{"w":48,"h":38.7,"ax":24,"ay":24.5},
-  "rocks-small":{"w":41,"h":34.7,"ax":20.5,"ay":22.5}
+  "rocks-small":{"w":41,"h":34.7,"ax":20.5,"ay":22.5},
+  "knight-idle":{"w":33.7,"h":59.7,"ax":19.1,"ay":51.1,"frames":6,"mask":true},
+  "knight-walk":{"w":50.3,"h":62.7,"ax":32.5,"ay":51.4,"frames":8,"mask":true},
+  "knight-fight":{"w":74.3,"h":71.3,"ax":37.8,"ay":57.3,"frames":7,"mask":true},
+  "knight-death":{"w":70.7,"h":88,"ax":49.1,"ay":52.2,"frames":6,"mask":true},
+  "soldier-idle":{"w":33.7,"h":55.7,"ax":19.1,"ay":47.3,"frames":6,"mask":true},
+  "soldier-walk":{"w":45,"h":60,"ax":27.3,"ay":49.6,"frames":8,"mask":true},
+  "soldier-fight":{"w":65,"h":69,"ax":33.2,"ay":55.2,"frames":7,"mask":true},
+  "soldier-death":{"w":70.7,"h":80.7,"ax":49.2,"ay":50.6,"frames":6,"mask":true}
 }

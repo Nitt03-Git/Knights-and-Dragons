@@ -636,10 +636,10 @@ describe('looks', () => {
     expect(lookChanges(DEFAULT_LOOKS)).toEqual({});
     const changed = structuredClone(DEFAULT_LOOKS);
     changed.troll.bounce = 2.5;
-    changed.knight.colors!.tabard = '#aa0000';
+    changed.knight.colors!.armor = '#aa0000';
     changed.wizard.roof = 'yellow';
     const json = changesToJson(changed);
-    expect(JSON.parse(json)).toEqual({ troll: { bounce: 2.5 }, knight: { colors: { tabard: '#aa0000' } }, wizard: { roof: 'yellow' } });
+    expect(JSON.parse(json)).toEqual({ troll: { bounce: 2.5 }, knight: { colors: { armor: '#aa0000' } }, wizard: { roof: 'yellow' } });
     expect(mergeLooks(DEFAULT_LOOKS, JSON.parse(json))).toEqual(changed);
   });
 
@@ -647,13 +647,17 @@ describe('looks', () => {
     expect(JSON.parse(looksToJson(DEFAULT_LOOKS))).toEqual(DEFAULT_LOOKS);
   });
 
-  it('has a picture for every tower level, roof and stone, and every catapult arm step', () => {
+  it('has a picture for every tower level, roof and stone, catapult arm step and knight animation', () => {
     for (const type of ['archer', 'knights', 'wizard']) {
       for (const level of [0, 1, 2]) for (const roof of LOOK_CHOICES.roof.options) for (const stone of LOOK_CHOICES.stone.options) {
         expect(hasSprite(`${type}-${level}-${roof}-${stone}`), `${type}-${level}-${roof}-${stone}`).toBe(true);
       }
     }
     for (const roof of LOOK_CHOICES.roof.options) for (const f of [0, 1, 2, 3, 4]) expect(hasSprite(`catapult-${f}-${roof}`)).toBe(true);
+    for (const unit of ['knight', 'soldier']) for (const anim of ['idle', 'walk', 'fight', 'death']) {
+      expect(hasSprite(`${unit}-${anim}`), `${unit}-${anim}`).toBe(true);
+      expect(hasSprite(`${unit}-${anim}-mask`)).toBe(true);
+    }
     for (const level of BALANCE.towers.archer.levels.keys()) expect(level).toBeLessThan(3);
   });
 

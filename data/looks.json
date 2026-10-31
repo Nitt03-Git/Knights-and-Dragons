@@ -1,6 +1,6 @@
 {
-  "knight": { "size": 1, "bounce": 1, "speed": 1, "swing": 1, "colors": { "armor": "#d4d9e0", "tabard": "#2f5d9a", "trim": "#ffd54a" } },
-  "soldier": { "size": 1, "bounce": 1, "speed": 1, "swing": 1, "colors": { "armor": "#d4d9e0", "tabard": "#3d7a3a", "trim": "#ffd54a" } },
+  "knight": { "size": 1.15, "speed": 1, "colors": { "armor": "#4a72b0" } },
+  "soldier": { "size": 1.15, "speed": 1, "colors": { "armor": "#4f9a48" } },
   "hero": { "size": 1, "bounce": 1, "speed": 1, "swing": 1, "colors": { "horse": "#8a5a33", "mane": "#3b2414", "armor": "#d4d9e0", "cloth": "#2f5d9a", "trim": "#ffd54a", "plume": "#c0392b" } },
   "kobold": { "size": 1, "bounce": 1, "speed": 1, "colors": { "body": "#c0622d", "belly": "#e8a060" } },
   "brute": { "size": 1, "bounce": 1, "speed": 1, "colors": { "body": "#4f6b8a", "belly": "#8aa4bf" } },

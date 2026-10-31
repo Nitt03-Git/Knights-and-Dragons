@@ -16,12 +16,19 @@ const PX_PER_WORLD = PX / WORLD_PER_UNIT;
 const only = process.argv.slice(2);
 const server = await createServer({ root: process.cwd(), server: { port: 5199 }, logLevel: 'error' });
 await server.listen();
-const { RECIPES } = await server.ssrLoadModule('/tools/sprites/recipes.ts');
+const { RECIPES, CHARACTERS } = await server.ssrLoadModule('/tools/sprites/recipes.ts');
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const page = await browser.newPage();
 page.on('pageerror', (e) => console.error(e.message));
 await page.goto('http://localhost:5199/tools/sprites/index.html');
 await page.waitForFunction(() => window.ready);
+
+if (only[0] === '--inspect') {
+  console.log(JSON.stringify(await page.evaluate((p) => window.inspectFbx(p), only[1]), null, 1));
+  await browser.close();
+  await server.close();
+  process.exit(0);
+}
 
 mkdirSync('public/sprites', { recursive: true });
 const manifest = {};
@@ -32,6 +39,15 @@ for (const r of RECIPES) {
   const round = (n) => Math.round((n / PX_PER_WORLD) * 10) / 10;
   manifest[r.name] = { w: round(s.w), h: round(s.h), ax: round(s.ax), ay: round(s.ay) };
   console.log(r.name, `${s.w}×${s.h}px`);
+}
+for (const r of CHARACTERS) {
+  if (only.length && !only.some((o) => r.name.startsWith(o))) continue;
+  const s = await page.evaluate((rec) => window.renderCharacterSheet(rec), r);
+  writeFileSync(`public/sprites/${r.name}.png`, Buffer.from(s.sheet.split(',')[1], 'base64'));
+  if (s.mask) writeFileSync(`public/sprites/${r.name}-mask.png`, Buffer.from(s.mask.split(',')[1], 'base64'));
+  const round = (n) => Math.round((n / PX_PER_WORLD) * 10) / 10;
+  manifest[r.name] = { w: round(s.w), h: round(s.h), ax: round(s.ax), ay: round(s.ay), frames: s.frames, ...(s.mask ? { mask: true } : {}) };
+  console.log(r.name, `${s.frames} × ${s.w}×${s.h}px`);
 }
 if (!only.length) writeFileSync('src/sprites.json', JSON.stringify(manifest, null, 0).replace(/\},"/g, '},\n  "').replace(/^\{/, '{\n  ').replace(/\}$/, '\n}') + '\n');
 await browser.close();

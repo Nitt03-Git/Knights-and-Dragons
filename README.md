@@ -82,8 +82,12 @@ changes are stored only in your phone's browser.
 
 ## Art
 
-Towers and trees: [Castle Kit](https://kenney.nl/assets/castle-kit) by Kenney (CC0, free to use),
-in `art/castle-kit`. `npm run sprites` turns the 3D models into the game's pictures.
+- Towers and trees: [Castle Kit](https://kenney.nl/assets/castle-kit) by Kenney (CC0), in
+  `art/castle-kit`.
+- Knights and Reinforcements: [Knight Pack](https://quaternius.com/packs/knightcharacter.html)
+  by Quaternius (CC0), in `art/knight-pack`.
+
+Both are free to use. `npm run sprites` turns the 3D models into the game's pictures.
 
 ## Building (for developers)
 

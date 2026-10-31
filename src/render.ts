@@ -1,7 +1,7 @@
 // Draws the game with simple shapes. Phase 2 replaces these draw functions with real art;
 // nothing in here changes the game.
 import { colorsOf, lookOf, rgb, shade, type Look } from './looks';
-import { drawSprite, preload, sprite } from './sprites';
+import { drawFrame, drawSprite, frameCount, preload, sprite } from './sprites';
 import { makeRng } from './rng';
 import { FLY_HEIGHT, WORLD_H, WORLD_W, type Enemy, type Game, type Hero, type Knight, type Projectile, type Strike, type Tower } from './sim';
 
@@ -115,6 +115,9 @@ export class Renderer {
   private heroFacing = 1;
   private heroLastX = 0;
   private scenery: Scenery[] = [];
+  /** Which way each knight faces (1 right, -1 left), and where it was last frame. */
+  private faces = new Map<number, number>();
+  private lastX = new Map<number, number>();
 
   constructor(private ctx: CanvasRenderingContext2D, game: Game) {
     this.scenery = makeScenery(game);
@@ -216,18 +219,23 @@ export class Renderer {
       const unit = t && game.towerLevel(t.type, t.level)?.unit;
       if (t && unit) {
         for (const k of t.knights) {
-          if (k.state !== 'dead') items.push({ y: k.y, draw: () => drawKnight(ctx, k, unit.hp, game.time, game.inRally(k)) });
+          // Fallen knights lie on the road a moment before fading away.
+          const deadFor = k.state === 'dead' ? unit.respawn - k.respawnIn : 0;
+          if (k.state === 'dead' && deadFor > FALLEN_FOR) continue;
+          const face = this.faceOf(game, k);
+          items.push({ y: k.y, draw: () => drawKnight(ctx, k, unit.hp, game.time, game.inRally(k), 'knight', face, deadFor) });
         }
       }
     });
     for (const k of game.soldiers) {
-      // Reinforcements: green tabards, fading out as they leave.
+      // Reinforcements: green, fading out as they leave.
       const alpha = Math.max(0.15, Math.min(1, k.leavesIn / 1.5));
+      const face = this.faceOf(game, k);
       items.push({
         y: k.y,
         draw: () => {
           ctx.globalAlpha = alpha;
-          drawKnight(ctx, k, game.soldierStats().hp, game.time, game.inRally(k), 'soldier');
+          drawKnight(ctx, k, game.soldierStats().hp, game.time, game.inRally(k), 'soldier', face);
           ctx.globalAlpha = 1;
         },
       });
@@ -243,6 +251,18 @@ export class Renderer {
 
 
     this.drawFloaters(game, dt);
+  }
+
+  /** Knights face the enemy they fight, otherwise the way they last walked. */
+  private faceOf(game: Game, k: Knight): number {
+    let f = this.faces.get(k.id) ?? -1;
+    const foe = k.state === 'fighting' && k.target !== null ? game.enemies.find((e) => e.id === k.target) : undefined;
+    const lx = this.lastX.get(k.id);
+    if (foe) f = foe.x > k.x ? 1 : -1;
+    else if (lx !== undefined && Math.abs(k.x - lx) > 0.2) f = k.x > lx ? 1 : -1;
+    this.lastX.set(k.id, k.x);
+    this.faces.set(k.id, f);
+    return f;
   }
 
   private drawRoads(game: Game): void {
@@ -608,6 +628,7 @@ export function towerSprite(t: TowerLook, cooldown: number): string {
 /** Starts loading the pictures the game shows: towers as they look now, and trees. */
 export function preloadPictures(): void {
   const names = ['tree-large', 'tree-small'];
+  for (const unit of ['knight', 'soldier']) for (const anim of Object.keys(KNIGHT_ANIMS)) names.push(`${unit}-${anim}`, `${unit}-${anim}-mask`);
   for (const type of ['archer', 'knights', 'wizard']) for (const level of [0, 1, 2]) names.push(towerSprite({ type, level, shotAge: 9 }, 1));
   for (let f = 0; f <= 4; f++) names.push(`catapult-${f}-${lookOf('catapult').roof}`);
   preload(names);
@@ -924,11 +945,47 @@ export function drawHero(ctx: CanvasRenderingContext2D, h: Hero, maxHp: number, 
   }
 }
 
-/** A knight from a hall, or a Reinforcement (`lookId` 'soldier'). */
-export function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: number, time: number, rallied: boolean, lookId = 'knight'): void {
+/** How long each knight animation lasts, in seconds (see tools/sprites/recipes.ts). */
+const KNIGHT_ANIMS: Record<string, number> = { idle: 3.33, walk: 1.25, fight: 1.17, death: 1.42 };
+/** How long a fallen knight stays on the ground before fading away. */
+export const FALLEN_FOR = 2.4;
+
+/**
+ * A knight from a hall, or a Reinforcement (`lookId` 'soldier'): the Knight Pack pictures once
+ * loaded, drawn shapes until then. `facing` 1 is right; `deadFor` is seconds since it fell.
+ */
+export function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: number, time: number, rallied: boolean, lookId = 'knight', facing = -1, deadFor = 0): void {
   const look = lookOf(lookId);
   const col = look.colors ?? colorsOf('');
   const speed = look.speed ?? 1;
+  const anim = k.state === 'dead' ? 'death' : k.state === 'walking' ? 'walk' : k.state === 'fighting' ? 'fight' : 'idle';
+  const pic = `${lookId}-${anim}`;
+  if (sprite(pic)) {
+    if (rallied && anim !== 'death') rallyGlow(ctx, k.x, k.y);
+    const n = frameCount(pic);
+    const len = KNIGHT_ANIMS[anim];
+    // Each knight starts its loop at a different moment, so a group doesn't move in lockstep.
+    const frame = anim === 'death' ? Math.min(n - 1, (deadFor / len) * n) : ((time * speed + k.id * 0.37) / len) * n;
+    const size = look.size;
+    ctx.save();
+    if (anim === 'death') ctx.globalAlpha *= Math.max(0, Math.min(1, (FALLEN_FOR - deadFor) / 0.8));
+    shadow(ctx, k.x, k.y, 11 * size);
+    drawFrame(ctx, pic, frame, k.x, k.y, { faceRight: facing > 0, size, tint: col.armor, flash: k.hitAge < 0.08 });
+    ctx.restore();
+    if (anim === 'death') return;
+    const top = k.y - 50 * size;
+    if (k.hp < maxHp) {
+      const w = 26;
+      const f = Math.max(0, k.hp / maxHp);
+      ctx.fillStyle = C.hpBack;
+      ctx.fillRect(k.x - w / 2 - 1, top - 1, w + 2, 6);
+      ctx.fillStyle = f > 0.35 ? '#6fb8ff' : C.hpLow;
+      ctx.fillRect(k.x - w / 2, top, w * f, 4);
+    }
+    if (rallied) rallyPlus(ctx, k.x, top - 10 + Math.sin(time * 4 + k.id) * 1.5);
+    return;
+  }
+  if (k.state === 'dead') return;
   if (rallied) {
     // Inside the hero's Rallying Banner: a gold glow under the feet.
     const glow = ctx.createRadialGradient(k.x, k.y, 0, k.x, k.y, 20);
@@ -947,14 +1004,14 @@ export function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: numb
   shadow(ctx, k.x, k.y, r);
   const cy = k.y - r - 2 - bob;
   // Body with tabard
-  ctx.fillStyle = k.hitAge < 0.08 ? '#ffffff' : col.armor;
+  ctx.fillStyle = k.hitAge < 0.08 ? '#ffffff' : '#d4d9e0';
   ctx.beginPath();
   ctx.arc(k.x, cy, r, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = col.tabard;
+  ctx.fillStyle = col.armor;
   ctx.fillRect(k.x - 5, cy - 2, 10, 10);
   // Helmet visor
-  ctx.strokeStyle = shade(col.armor, -0.35);
+  ctx.strokeStyle = '#8d96a3';
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(k.x - 5, cy - 5);
@@ -973,8 +1030,8 @@ export function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: numb
   ctx.stroke();
   ctx.restore();
   // Shield
-  ctx.fillStyle = col.tabard;
-  ctx.strokeStyle = col.trim;
+  ctx.fillStyle = col.armor;
+  ctx.strokeStyle = C.gold;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(k.x - 13, cy - 5);
@@ -1010,6 +1067,32 @@ export function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: numb
     ctx.stroke();
   }
   ctx.restore();
+}
+
+/** Inside the hero's Rallying Banner: a gold glow under the feet... */
+function rallyGlow(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  const glow = ctx.createRadialGradient(x, y, 0, x, y, 20);
+  glow.addColorStop(0, 'rgba(255, 213, 74, 0.75)');
+  glow.addColorStop(1, 'rgba(255, 213, 74, 0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.ellipse(x, y, 20, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/** ...and a small gold plus above the head. */
+function rallyPlus(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  ctx.strokeStyle = 'rgba(60, 40, 10, 0.8)';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(x - 4, y);
+  ctx.lineTo(x + 4, y);
+  ctx.moveTo(x, y - 4);
+  ctx.lineTo(x, y + 4);
+  ctx.stroke();
+  ctx.strokeStyle = C.gold;
+  ctx.lineWidth = 2;
+  ctx.stroke();
 }
 
 export function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, roadLength: number): void {

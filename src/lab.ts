@@ -3,10 +3,10 @@
 // JSON to paste in the chat (Claude then puts them in data/looks.json for everyone).
 import { BALANCE } from './data';
 import { CHOICE_KEYS, changesToJson, COLOR_NAMES, DEFAULT_LOOKS, LOOK_CHOICES, LOOK_NAMES, LOOK_SLIDERS, LOOKS, lookChanges, resetLooks, setLookChoice, setLookColor, setLookNumber, sliderLabel, type ChoiceKey, type SliderKey } from './looks';
-import { drawEnemy, drawHero, drawKnight, drawTower, preloadPictures } from './render';
+import { drawEnemy, drawHero, drawKnight, drawTower, FALLEN_FOR, preloadPictures } from './render';
 import type { Enemy, Hero, Knight } from './sim';
 
-export type Pose = 'walk' | 'fight' | 'hurt' | 'still';
+export type Pose = 'walk' | 'fight' | 'hurt' | 'still' | 'fall';
 
 export interface LabHost {
   canvas: HTMLCanvasElement;
@@ -27,8 +27,8 @@ export const SPOTS: Record<string, { x: number; y: number; h: number }> = {
   knights: { x: 240, y: 170, h: 100 },
   wizard: { x: 390, y: 170, h: 150 },
   catapult: { x: 540, y: 170, h: 80 },
-  knight: { x: 120, y: 295, h: 45 },
-  soldier: { x: 230, y: 295, h: 45 },
+  knight: { x: 120, y: 295, h: 60 },
+  soldier: { x: 230, y: 295, h: 60 },
   hero: { x: 410, y: 295, h: 80 },
   kobold: { x: 70, y: 415, h: 32 },
   brute: { x: 185, y: 415, h: 42 },
@@ -181,8 +181,10 @@ export class Lab {
     const state = pose === 'walk' ? 'walking' : pose === 'fight' ? 'fighting' : 'idle';
     if (id === 'knight' || id === 'soldier') {
       const maxHp = 100;
-      const k = { id: id === 'knight' ? 1 : 2, x, y, hp: pose === 'hurt' ? 60 : maxHp, state, hitAge } as unknown as Knight;
-      drawKnight(ctx, k, maxHp, time, false, id);
+      // Fall: the knight falls, lies a moment, and gets up again (the loop starts over).
+      const fallen = pose === 'fall' ? time % (FALLEN_FOR + 0.6) : 0;
+      const k = { id: id === 'knight' ? 1 : 2, x, y, hp: pose === 'hurt' ? 60 : maxHp, state: pose === 'fall' ? 'dead' : state, hitAge } as unknown as Knight;
+      drawKnight(ctx, k, maxHp, time, false, id, -1, fallen);
       return;
     }
     if (id === 'hero') {
@@ -208,8 +210,9 @@ export class Lab {
     const edited = lookChanges(LOOKS);
     // Units with changes get a pencil in the list.
     const options = Object.keys(LOOKS).map((k) => `<option value="${k}" ${k === id ? 'selected' : ''}>${LOOK_NAMES[k] ?? k}${edited[k] ? ' ✏️' : ''}</option>`).join('');
-    const poses: [Pose, string][] = [['walk', isTower ? 'Idle' : 'Walk'], ['fight', isTower ? 'Shoot' : 'Fight'], ['hurt', 'Hurt'], ['still', 'Still']];
-    const poseRow = (isTower ? poses.filter(([p]) => p !== 'walk' && p !== 'hurt') : poses)
+    const poses: [Pose, string][] = [['walk', isTower ? 'Idle' : 'Walk'], ['fight', isTower ? 'Shoot' : 'Fight'], ['hurt', 'Hurt'], ['still', 'Still'], ['fall', 'Fall']];
+    const canFall = id === 'knight' || id === 'soldier';
+    const poseRow = (isTower ? poses.filter(([p]) => p !== 'walk' && p !== 'hurt' && p !== 'fall') : poses.filter(([p]) => p !== 'fall' || canFall))
       .map(([p, label]) => `<button class="pill small${this.pose === p || (isTower && this.pose !== 'fight' && p === 'still') ? ' on' : ''}" data-pose="${p}">${label}</button>`).join('');
     const levelRow = isTower
       ? `<div class="row"><span class="lbl">Level</span>${[0, 1, 2].map((l) => `<button class="pill small${this.towerLevel === l ? ' on' : ''}" data-level="${l}">${l + 1}</button>`).join('')}</div>`

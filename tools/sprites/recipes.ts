@@ -60,3 +60,42 @@ recipes.push(
 );
 
 export const RECIPES = recipes;
+
+// ---- Characters: Quaternius' Knight Pack (art/knight-pack, CC0) ----
+
+const KNIGHT = '/art/knight-pack/KnightCharacter.fbx';
+const kit = (helmet: string, sword: string) => [
+  { file: `/art/knight-pack/${helmet}.fbx`, bone: 'Head', offset: [0, 110, 0], rotation: [0, 90, 0] },
+  { file: `/art/knight-pack/${sword}.fbx`, bone: 'PalmR', rotation: [90, 0, 0] },
+  { file: '/art/knight-pack/ShoulderPads.fbx', bone: 'Torso', offset: [0, 40, 0] },
+];
+/** n evenly spaced moments in an animation of `length` seconds. */
+const moments = (length: number, n: number) => Array.from({ length: n }, (_, i) => Math.round(((i * length) / n) * 1000) / 1000);
+
+/** The game's animations: name, the file's animation, its length and how many pictures. */
+export const ANIMS: [string, string, number, number][] = [
+  ['idle', 'Idle_swordRight', 3.33, 6],
+  ['walk', 'Walking', 1.25, 8],
+  ['fight', 'swordAttackJump', 1.17, 7],
+  ['death', 'Death', 1.42, 6],
+];
+
+const UNITS = [
+  { name: 'knight', props: kit('Helmet1', 'Sword') },
+  { name: 'soldier', props: kit('Helmet2', 'ShortSword') },
+];
+
+/** Characters face left (the game mirrors them to face right); the armour is tinted in the game. */
+export const CHARACTERS = UNITS.flatMap((u) =>
+  ANIMS.map(([anim, clip, length, n]) => ({
+    name: `${u.name}-${anim}`,
+    model: KNIGHT,
+    height: 0.8,
+    anim: clip,
+    times: moments(length, n),
+    facing: 180,
+    props: u.props,
+    colors: { Armor: '#dfe4ec', Skin: '#e0a87c', Boots: '#5a3a22' },
+    mask: 'Armor',
+  })),
+);
