@@ -62,11 +62,23 @@ If it still shows an older build, wait a few minutes: GitHub Pages caches the pa
 
 Your draft is kept on the phone, so you can stop and come back later.
 
+## Look Lab: change how things look
+
+1. On the level screen, tap **🎨 Looks**. Every unit and tower stands there, moving.
+2. Tap one (or pick it from the list at the top right) to change it: **Size**, **Bounce** (how
+   high it bobs), **Speed** (how fast legs, wings and swords move), **Sword swing** (or **Wing
+   flap**) and its colours.
+3. **Walk / Fight / Hurt / Still** shows everyone in that pose. For towers, **Shoot** and
+   **Level 1–3**. **🔍 Close-up** shows the chosen one large.
+4. Your changes are used in the game on this phone straight away. A ✏️ in the list marks the
+   ones you changed; **↺ Back to the game's look** undoes one, **↺ All** undoes everything.
+5. **📋 Copy**, then paste the text in the chat with Claude to make your looks everyone's.
+
 ## Privacy
 
 The game collects nothing and contacts nothing besides this website (fonts are included).
-It needs no permissions. Your stars, upgrades and hero experience are stored only in your
-phone's browser.
+It needs no permissions. Your stars, upgrades, hero experience, Studio draft and Look Lab
+changes are stored only in your phone's browser.
 
 ## Building (for developers)
 

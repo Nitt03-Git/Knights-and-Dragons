@@ -29,6 +29,8 @@ Full plan, decisions and milestones: `PLAN.md` (keep it up to date when the owne
 - Levels from the Level Studio arrive as pasted JSON: add the object to `data/levels.json`
   (keep its style, give it a unique `id`), move any stone spot the tests reject, run
   `npm run check` and `npm run balance`, and tell the owner how the bot did on it.
+- Looks from the Look Lab arrive as pasted JSON with only the changes: merge them into
+  `data/looks.json` (keep one line per unit), run `npm run check`, and screenshot the units.
 - No network calls, no trackers, no external scripts or fonts (fonts are bundled via
   @fontsource). README's privacy section must stay true.
 

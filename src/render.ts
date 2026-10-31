@@ -1,5 +1,6 @@
 // Draws the game with simple shapes. Phase 2 replaces these draw functions with real art;
 // nothing in here changes the game.
+import { lookOf, rgb, shade, type Look } from './looks';
 import { makeRng } from './rng';
 import { FLY_HEIGHT, WORLD_H, WORLD_W, type Enemy, type Game, type Hero, type Knight, type Projectile, type Strike, type Tower } from './sim';
 
@@ -77,23 +78,10 @@ const C = {
   wood: '#8b5a2b',
   stone: '#c9c2b4',
   stoneDark: '#9d9585',
-  archerRoof: '#2f7d4f',
-  hallRoof: '#2f5d9a',
-  steel: '#d4d9e0',
-  steelDark: '#8d96a3',
-  tabard: '#2f5d9a',
   hpBack: 'rgba(0,0,0,0.55)',
   hp: '#7ed957',
   hpLow: '#f05a3c',
   gold: '#ffd54a',
-};
-
-const ENEMY_LOOK: Record<string, { body: string; belly: string }> = {
-  kobold: { body: '#c0622d', belly: '#e8a060' },
-  brute: { body: '#4f6b8a', belly: '#8aa4bf' },
-  troll: { body: '#6b7d4a', belly: '#a3b07a' },
-  hexling: { body: '#6a3d8f', belly: '#b58bd6' },
-  wyrmling: { body: '#3f8f5a', belly: '#a8d98a' },
 };
 
 interface Floater {
@@ -206,7 +194,7 @@ export class Renderer {
     const items: Item[] = [];
     for (const s of this.scenery) if (s.kind === 'tree') items.push({ y: s.y, draw: () => drawScenery(ctx, s) });
     game.towers.forEach((t) => {
-      if (t) items.push({ y: game.pads[t.pad].y, draw: () => drawTower(ctx, game, t) });
+      if (t) items.push({ y: game.pads[t.pad].y, draw: () => towerAt(ctx, game, t) });
     });
     // A see-through tower where one is about to be built.
     if (o.preview && !game.towers[o.preview.pad]) {
@@ -215,7 +203,7 @@ export class Renderer {
         y: game.pads[o.preview.pad].y,
         draw: () => {
           ctx.globalAlpha = 0.55;
-          drawTower(ctx, game, ghost);
+          towerAt(ctx, game, ghost);
           ctx.globalAlpha = 1;
         },
       });
@@ -237,7 +225,7 @@ export class Renderer {
         y: k.y,
         draw: () => {
           ctx.globalAlpha = alpha;
-          drawKnight(ctx, k, game.soldierStats().hp, game.time, game.inRally(k), '#3d7a3a');
+          drawKnight(ctx, k, game.soldierStats().hp, game.time, game.inRally(k), 'soldier');
           ctx.globalAlpha = 1;
         },
       });
@@ -452,10 +440,11 @@ function drawProjectile(ctx: CanvasRenderingContext2D, p: Projectile): void {
     return;
   }
   if (p.kind === 'bolt') {
+    const orb = lookOf('wizard').colors.orb;
     const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 16);
-    glow.addColorStop(0, 'rgba(255, 240, 255, 1)');
-    glow.addColorStop(0.35, 'rgba(200, 120, 255, 0.9)');
-    glow.addColorStop(1, 'rgba(140, 60, 220, 0)');
+    glow.addColorStop(0, `rgba(${rgb(shade(orb, 0.85))}, 1)`);
+    glow.addColorStop(0.35, `rgba(${rgb(orb)}, 0.9)`);
+    glow.addColorStop(1, `rgba(${rgb(shade(orb, -0.3))}, 0)`);
     ctx.fillStyle = glow;
     ctx.beginPath();
     ctx.arc(p.x, p.y, 16, 0, Math.PI * 2);
@@ -494,14 +483,16 @@ function drawProjectile(ctx: CanvasRenderingContext2D, p: Projectile): void {
   ctx.restore();
 }
 
-function drawWizardTower(ctx: CanvasRenderingContext2D, game: Game, t: Tower): void {
-  const { x, y } = game.pads[t.pad];
+type TowerLook = Pick<Tower, 'type' | 'level' | 'shotAge'>;
+
+function drawWizardTower(ctx: CanvasRenderingContext2D, t: TowerLook, x: number, y: number, look: Look): void {
   shadow(ctx, x, y + 4, 36);
+  const orb = look.colors.orb;
   const w = 40;
   const h = 64 + t.level * 8;
-  ctx.fillStyle = '#9d93a8';
+  ctx.fillStyle = shade(look.colors.stone, -0.22);
   ctx.fillRect(x - w / 2, y - h, w, h);
-  ctx.fillStyle = '#c9c0d2';
+  ctx.fillStyle = look.colors.stone;
   ctx.fillRect(x - w / 2 + 4, y - h, w - 12, h);
   // Window
   ctx.fillStyle = '#3a2350';
@@ -511,7 +502,7 @@ function drawWizardTower(ctx: CanvasRenderingContext2D, game: Game, t: Tower): v
   ctx.lineTo(x - 7, y - h + 32);
   ctx.fill();
   // Tall pointed roof
-  ctx.fillStyle = '#5b2d86';
+  ctx.fillStyle = look.colors.roof;
   ctx.beginPath();
   ctx.moveTo(x - w / 2 - 8, y - h);
   ctx.lineTo(x, y - h - 56);
@@ -522,9 +513,9 @@ function drawWizardTower(ctx: CanvasRenderingContext2D, game: Game, t: Tower): v
   const flash = t.shotAge < 0.25 ? 1 - t.shotAge / 0.25 : 0;
   const r = 7 + flash * 4;
   const glow = ctx.createRadialGradient(x, y - h - 60, 0, x, y - h - 60, r * 2.4);
-  glow.addColorStop(0, 'rgba(255, 240, 255, 1)');
-  glow.addColorStop(0.4, `rgba(200, 120, 255, ${0.7 + flash * 0.3})`);
-  glow.addColorStop(1, 'rgba(140, 60, 220, 0)');
+  glow.addColorStop(0, `rgba(${rgb(shade(orb, 0.85))}, 1)`);
+  glow.addColorStop(0.4, `rgba(${rgb(orb)}, ${0.7 + flash * 0.3})`);
+  glow.addColorStop(1, `rgba(${rgb(shade(orb, -0.3))}, 0)`);
   ctx.fillStyle = glow;
   ctx.beginPath();
   ctx.arc(x, y - h - 60, r * 2.4, 0, Math.PI * 2);
@@ -532,16 +523,15 @@ function drawWizardTower(ctx: CanvasRenderingContext2D, game: Game, t: Tower): v
   levelPips(ctx, x, y - 12, t.level);
 }
 
-function drawCatapult(ctx: CanvasRenderingContext2D, game: Game, t: Tower): void {
-  const { x, y } = game.pads[t.pad];
+function drawCatapult(ctx: CanvasRenderingContext2D, t: TowerLook, x: number, y: number, look: Look, cooldown: number): void {
   shadow(ctx, x, y + 4, 44);
   // Stone platform
-  ctx.fillStyle = C.stoneDark;
+  ctx.fillStyle = shade(look.colors.stone, -0.22);
   ctx.fillRect(x - 34, y - 20, 68, 20);
-  ctx.fillStyle = C.stone;
+  ctx.fillStyle = look.colors.stone;
   ctx.fillRect(x - 30, y - 20, 56, 16);
   // Wooden frame
-  ctx.strokeStyle = C.wood;
+  ctx.strokeStyle = look.colors.wood;
   ctx.lineWidth = 6;
   ctx.beginPath();
   ctx.moveTo(x - 20, y - 20);
@@ -549,15 +539,14 @@ function drawCatapult(ctx: CanvasRenderingContext2D, game: Game, t: Tower): void
   ctx.lineTo(x + 12, y - 20);
   ctx.stroke();
   // Throwing arm: flung forward just after a shot, then wound back
-  const spec = game.towerLevel(t.type, t.level)!;
-  const back = Math.min(1, t.shotAge / (spec.cooldown * 0.6));
+  const back = Math.min(1, t.shotAge / (cooldown * 0.6));
   const angle = -0.35 - (1 - back) * 1.6 + back * 0.0;
   const px = x - 4;
   const py = y - 48 - t.level * 4;
   const len = 46;
   const ex = px + Math.cos(Math.PI + angle) * len;
   const ey = py + Math.sin(Math.PI + angle) * len * -1;
-  ctx.strokeStyle = '#6b4423';
+  ctx.strokeStyle = shade(look.colors.wood, -0.23);
   ctx.lineWidth = 5;
   ctx.beginPath();
   ctx.moveTo(px - (ex - px) * 0.3, py - (ey - py) * 0.3);
@@ -573,21 +562,38 @@ function drawCatapult(ctx: CanvasRenderingContext2D, game: Game, t: Tower): void
   levelPips(ctx, x, y - 8, t.level);
 }
 
-function drawTower(ctx: CanvasRenderingContext2D, game: Game, t: Tower): void {
-  if (t.type === 'knights') return drawHall(ctx, game, t);
-  if (t.type === 'wizard') return drawWizardTower(ctx, game, t);
-  if (t.type === 'catapult') return drawCatapult(ctx, game, t);
-  const { x, y } = game.pads[t.pad];
+/** A tower on its pad. */
+function towerAt(ctx: CanvasRenderingContext2D, game: Game, t: Tower): void {
+  const p = game.pads[t.pad];
+  drawTower(ctx, t, p.x, p.y, game.towerLevel(t.type, t.level)?.cooldown ?? 1);
+}
+
+/** A tower standing at (x, y), at the size and in the colours of its look. */
+export function drawTower(ctx: CanvasRenderingContext2D, t: TowerLook, x: number, y: number, cooldown: number): void {
+  const look = lookOf(t.type);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(look.size, look.size);
+  ctx.translate(-x, -y);
+  if (t.type === 'knights') drawHall(ctx, t, x, y, look);
+  else if (t.type === 'wizard') drawWizardTower(ctx, t, x, y, look);
+  else if (t.type === 'catapult') drawCatapult(ctx, t, x, y, look, cooldown);
+  else drawArcherTower(ctx, t, x, y, look);
+  ctx.restore();
+}
+
+function drawArcherTower(ctx: CanvasRenderingContext2D, t: TowerLook, x: number, y: number, look: Look): void {
+  const stoneDark = shade(look.colors.stone, -0.22);
   shadow(ctx, x, y + 4, 40);
   const recoil = t.shotAge < 0.1 ? 2 : 0;
   const w = 50;
   const h = 56 + t.level * 8;
   // Stone body
-  ctx.fillStyle = C.stoneDark;
+  ctx.fillStyle = stoneDark;
   ctx.fillRect(x - w / 2, y - h, w, h);
-  ctx.fillStyle = C.stone;
+  ctx.fillStyle = look.colors.stone;
   ctx.fillRect(x - w / 2 + 4, y - h, w - 12, h);
-  ctx.strokeStyle = C.stoneDark;
+  ctx.strokeStyle = stoneDark;
   ctx.lineWidth = 2;
   for (let row = 1; row * 14 < h; row++) {
     ctx.beginPath();
@@ -599,7 +605,7 @@ function drawTower(ctx: CanvasRenderingContext2D, game: Game, t: Tower): void {
   const top = y - h + recoil;
   ctx.fillStyle = C.wood;
   ctx.fillRect(x - w / 2 - 6, top - 8, w + 12, 10);
-  ctx.fillStyle = C.archerRoof;
+  ctx.fillStyle = look.colors.roof;
   ctx.beginPath();
   ctx.moveTo(x - w / 2 - 10, top - 8);
   ctx.lineTo(x, top - 46);
@@ -618,14 +624,13 @@ function levelPips(ctx: CanvasRenderingContext2D, x: number, y: number, level: n
   }
 }
 
-function drawHall(ctx: CanvasRenderingContext2D, game: Game, t: Tower): void {
-  const { x, y } = game.pads[t.pad];
+function drawHall(ctx: CanvasRenderingContext2D, t: TowerLook, x: number, y: number, look: Look): void {
   shadow(ctx, x, y + 4, 44);
   const w = 70;
   const h = 34 + t.level * 5;
-  ctx.fillStyle = C.stoneDark;
+  ctx.fillStyle = shade(look.colors.stone, -0.22);
   ctx.fillRect(x - w / 2, y - h, w, h);
-  ctx.fillStyle = C.stone;
+  ctx.fillStyle = look.colors.stone;
   ctx.fillRect(x - w / 2 + 4, y - h, w - 12, h);
   // Door
   ctx.fillStyle = '#5b3a1e';
@@ -636,7 +641,7 @@ function drawHall(ctx: CanvasRenderingContext2D, game: Game, t: Tower): void {
   ctx.lineTo(x + 9, y);
   ctx.fill();
   // Roof
-  ctx.fillStyle = C.hallRoof;
+  ctx.fillStyle = look.colors.roof;
   ctx.beginPath();
   ctx.moveTo(x - w / 2 - 8, y - h);
   ctx.lineTo(x - w / 2 + 12, y - h - 30);
@@ -647,7 +652,7 @@ function drawHall(ctx: CanvasRenderingContext2D, game: Game, t: Tower): void {
   // Banner pole on the roof
   ctx.fillStyle = '#5b3a1e';
   ctx.fillRect(x + 18, y - h - 58, 3, 30);
-  ctx.fillStyle = C.gold;
+  ctx.fillStyle = look.colors.banner;
   ctx.beginPath();
   ctx.moveTo(x + 21, y - h - 58);
   ctx.lineTo(x + 40, y - h - 52);
@@ -690,7 +695,7 @@ function drawFlag(ctx: CanvasRenderingContext2D, x: number, y: number, big: bool
   ctx.fill();
   ctx.fillStyle = '#5b3a1e';
   ctx.fillRect(x - 1.5 * s, y - 34 * s, 3 * s, 34 * s);
-  ctx.fillStyle = C.tabard;
+  ctx.fillStyle = lookOf('knight').colors.tabard;
   ctx.beginPath();
   ctx.moveTo(x + 1.5 * s, y - 34 * s);
   ctx.lineTo(x + 22 * s, y - 28 * s);
@@ -745,28 +750,40 @@ function drawMarker(ctx: CanvasRenderingContext2D, x: number, y: number): void {
   ctx.fill();
 }
 
+/** Scales what follows by `size` around the point (x, y), where the unit stands. */
+function scaleAround(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+  ctx.translate(x, y);
+  ctx.scale(size, size);
+  ctx.translate(-x, -y);
+}
+
 /** The hero: a knight on a horse, facing `facing` (1 right, -1 left). */
-function drawHero(ctx: CanvasRenderingContext2D, h: Hero, maxHp: number, time: number, facing: number): void {
+export function drawHero(ctx: CanvasRenderingContext2D, h: Hero, maxHp: number, time: number, facing: number): void {
+  const look = lookOf('hero');
+  const col = look.colors;
+  const speed = look.speed ?? 1;
   const moving = h.state === 'walking';
-  const gallop = moving ? Math.sin(time * 16) : 0;
-  shadow(ctx, h.x, h.y, 30);
+  const gallop = moving ? Math.sin(time * 16 * speed) : 0;
+  const flash = h.hitAge < 0.08;
   ctx.save();
+  scaleAround(ctx, h.x, h.y, look.size);
+  shadow(ctx, h.x, h.y, 30);
   ctx.translate(h.x, h.y);
   ctx.scale(facing, 1);
-  const bob = moving ? Math.abs(gallop) * 3 : 0;
+  const bob = moving ? Math.abs(gallop) * 3 * (look.bounce ?? 1) : 0;
   // Legs
-  ctx.strokeStyle = '#5a3a20';
+  ctx.strokeStyle = shade(col.horse, -0.35);
   ctx.lineWidth = 5;
   ctx.lineCap = 'round';
   for (const [lx, phase] of [[-16, 0], [-8, 1], [10, 1], [18, 0]] as const) {
-    const swing = moving ? Math.sin(time * 16 + phase * Math.PI) * 6 : 0;
+    const swing = moving ? Math.sin(time * 16 * speed + phase * Math.PI) * 6 : 0;
     ctx.beginPath();
     ctx.moveTo(lx, -20 - bob);
     ctx.lineTo(lx + swing, -2);
     ctx.stroke();
   }
   // Horse body, neck and head
-  ctx.fillStyle = h.hitAge < 0.08 ? '#ffffff' : '#8a5a33';
+  ctx.fillStyle = flash ? '#ffffff' : col.horse;
   ctx.beginPath();
   ctx.ellipse(0, -26 - bob, 26, 12, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -781,7 +798,7 @@ function drawHero(ctx: CanvasRenderingContext2D, h: Hero, maxHp: number, time: n
   ctx.ellipse(36, -46 - bob, 9, 5, 0.5, 0, Math.PI * 2);
   ctx.fill();
   // Mane and tail
-  ctx.strokeStyle = '#3b2414';
+  ctx.strokeStyle = col.mane;
   ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.moveTo(18, -36 - bob);
@@ -789,35 +806,35 @@ function drawHero(ctx: CanvasRenderingContext2D, h: Hero, maxHp: number, time: n
   ctx.moveTo(-25, -28 - bob);
   ctx.quadraticCurveTo(-36, -24 - bob, -34, -12 - bob + gallop * 2);
   ctx.stroke();
-  // Blue caparison (horse blanket)
-  ctx.fillStyle = C.tabard;
+  // Horse blanket
+  ctx.fillStyle = col.cloth;
   ctx.fillRect(-14, -34 - bob, 20, 14);
-  ctx.fillStyle = C.gold;
+  ctx.fillStyle = col.trim;
   ctx.fillRect(-14, -22 - bob, 20, 2);
   // Rider
   const ry = -44 - bob;
-  ctx.fillStyle = h.hitAge < 0.08 ? '#ffffff' : C.steel;
+  ctx.fillStyle = flash ? '#ffffff' : col.armor;
   ctx.beginPath();
   ctx.arc(-2, ry, 10, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
   ctx.arc(-2, ry - 14, 7, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = C.steelDark;
+  ctx.strokeStyle = shade(col.armor, -0.35);
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(-6, ry - 15);
   ctx.lineTo(4, ry - 15);
   ctx.stroke();
-  // Red plume
-  ctx.fillStyle = '#c0392b';
+  // Plume
+  ctx.fillStyle = col.plume;
   ctx.beginPath();
   ctx.moveTo(-4, ry - 20);
   ctx.quadraticCurveTo(-16, ry - 30, -18, ry - 16);
   ctx.quadraticCurveTo(-10, ry - 22, -2, ry - 19);
   ctx.fill();
   // Sword, swinging while fighting
-  const swing = h.state === 'fighting' ? Math.sin(time * 9) * 0.9 : 0.4;
+  const swing = h.state === 'fighting' ? Math.sin(time * 9 * speed) * 0.9 * (look.swing ?? 1) : 0.4;
   ctx.save();
   ctx.translate(6, ry);
   ctx.rotate(-1.1 + swing);
@@ -829,8 +846,8 @@ function drawHero(ctx: CanvasRenderingContext2D, h: Hero, maxHp: number, time: n
   ctx.stroke();
   ctx.restore();
   // Shield with a gold rim
-  ctx.fillStyle = C.tabard;
-  ctx.strokeStyle = C.gold;
+  ctx.fillStyle = col.cloth;
+  ctx.strokeStyle = col.trim;
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(-16, ry - 6);
@@ -842,11 +859,11 @@ function drawHero(ctx: CanvasRenderingContext2D, h: Hero, maxHp: number, time: n
   ctx.fill();
   ctx.stroke();
   ctx.restore();
-  // Health bar (gold-edged so it stands out from the knights')
+  // Health bar (gold-edged so it stands out from the knights'), above the rider at any size
   if (h.hp < maxHp) {
     const w = 44;
     const f = Math.max(0, h.hp / maxHp);
-    const by = h.y - 84;
+    const by = h.y - 84 * look.size;
     ctx.fillStyle = C.gold;
     ctx.fillRect(h.x - w / 2 - 2, by - 2, w + 4, 9);
     ctx.fillStyle = C.hpBack;
@@ -856,7 +873,11 @@ function drawHero(ctx: CanvasRenderingContext2D, h: Hero, maxHp: number, time: n
   }
 }
 
-function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: number, time: number, rallied: boolean, tabard = C.tabard): void {
+/** A knight from a hall, or a Reinforcement (`lookId` 'soldier'). */
+export function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: number, time: number, rallied: boolean, lookId = 'knight'): void {
+  const look = lookOf(lookId);
+  const col = look.colors;
+  const speed = look.speed ?? 1;
   if (rallied) {
     // Inside the hero's Rallying Banner: a gold glow under the feet.
     const glow = ctx.createRadialGradient(k.x, k.y, 0, k.x, k.y, 20);
@@ -869,29 +890,27 @@ function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: number, tim
   }
   // Drawn at 10 units and scaled up around the feet.
   ctx.save();
-  ctx.translate(k.x, k.y);
-  ctx.scale(1.4, 1.4);
-  ctx.translate(-k.x, -k.y);
+  scaleAround(ctx, k.x, k.y, 1.4 * look.size);
   const r = 10;
-  const bob = k.state === 'walking' ? Math.abs(Math.sin(time * 12 + k.id)) * 2.5 : 0;
+  const bob = k.state === 'walking' ? Math.abs(Math.sin(time * 12 * speed + k.id)) * 2.5 * (look.bounce ?? 1) : 0;
   shadow(ctx, k.x, k.y, r);
   const cy = k.y - r - 2 - bob;
-  // Body with blue tabard
-  ctx.fillStyle = k.hitAge < 0.08 ? '#ffffff' : C.steel;
+  // Body with tabard
+  ctx.fillStyle = k.hitAge < 0.08 ? '#ffffff' : col.armor;
   ctx.beginPath();
   ctx.arc(k.x, cy, r, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = tabard;
+  ctx.fillStyle = col.tabard;
   ctx.fillRect(k.x - 5, cy - 2, 10, 10);
   // Helmet visor
-  ctx.strokeStyle = C.steelDark;
+  ctx.strokeStyle = shade(col.armor, -0.35);
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(k.x - 5, cy - 5);
   ctx.lineTo(k.x + 5, cy - 5);
   ctx.stroke();
   // Sword: swings while fighting
-  const swing = k.state === 'fighting' ? Math.sin(time * 10 + k.id) * 0.9 : 0.3;
+  const swing = k.state === 'fighting' ? Math.sin(time * 10 * speed + k.id) * 0.9 * (look.swing ?? 1) : 0.3;
   ctx.save();
   ctx.translate(k.x + 8, cy);
   ctx.rotate(-1.2 + swing);
@@ -903,8 +922,8 @@ function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: number, tim
   ctx.stroke();
   ctx.restore();
   // Shield
-  ctx.fillStyle = tabard;
-  ctx.strokeStyle = C.gold;
+  ctx.fillStyle = col.tabard;
+  ctx.strokeStyle = col.trim;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(k.x - 13, cy - 5);
@@ -942,19 +961,23 @@ function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: number, tim
   ctx.restore();
 }
 
-function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, roadLength: number): void {
+export function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, roadLength: number): void {
   // Fade in and out at the ends of the road instead of popping.
   ctx.globalAlpha = Math.max(0, Math.min(1, e.d / 60, (roadLength - e.d) / 60));
-  const r = e.spec.size;
-  const look = ENEMY_LOOK[e.type] ?? { body: '#999', belly: '#ccc' };
+  const look = lookOf(e.type);
+  const r = e.spec.size * look.size;
   const flying = !!e.spec.flying;
-  const bob = flying ? Math.sin(e.d / 14) * 4 : Math.abs(Math.sin(e.d / 9)) * 3;
+  // Steps (and wing beats) follow the distance walked, so faster enemies move their legs faster.
+  const step = e.d * (look.speed ?? 1);
+  const bob = (flying ? Math.sin(step / 14) * 4 : Math.abs(Math.sin(step / 9)) * 3) * (look.bounce ?? 1);
   shadow(ctx, e.x, e.y, flying ? r * 0.7 : r);
   const cy = e.y - r - bob - (flying ? FLY_HEIGHT : 0);
+  const body = look.colors.body;
+  const belly = look.colors.belly;
   if (flying) {
     // Flapping wings behind the body
-    const flap = Math.sin(e.d / 6) * 0.6;
-    ctx.fillStyle = look.belly;
+    const flap = Math.sin(step / 6) * 0.6 * (look.swing ?? 1);
+    ctx.fillStyle = belly;
     for (const side of [-1, 1]) {
       ctx.beginPath();
       ctx.moveTo(e.x + side * r * 0.4, cy);
@@ -964,11 +987,11 @@ function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, roadLength: number):
       ctx.fill();
     }
   }
-  ctx.fillStyle = e.hitAge < 0.08 ? '#ffffff' : look.body;
+  ctx.fillStyle = e.hitAge < 0.08 ? '#ffffff' : body;
   ctx.beginPath();
   ctx.arc(e.x, cy, r, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = look.belly;
+  ctx.fillStyle = belly;
   ctx.beginPath();
   ctx.ellipse(e.x, cy + r * 0.3, r * 0.6, r * 0.5, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -984,7 +1007,7 @@ function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, roadLength: number):
   ctx.fill();
   if (e.type === 'hexling') {
     // Pointed hood
-    ctx.fillStyle = look.body;
+    ctx.fillStyle = body;
     ctx.beginPath();
     ctx.moveTo(e.x - r * 0.8, cy - r * 0.5);
     ctx.lineTo(e.x + r * 0.2, cy - r * 2);

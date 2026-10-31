@@ -155,9 +155,11 @@ Each one is a version the owner can play from the link.
   290 and the trolls come together again; wave 4's second kobold group now uses the second
   road. Meant to be beaten with the hero and specials: the bot (which uses neither) loses it,
   so `test/balance.test.ts` skips "a full defence wins" for X-Road on purpose.
-- **0.9**: **Look Lab**: every unit animating side by side with sliders (size, bounce, swing
-  speed, colours); "Copy" the settings to paste in the chat. Owner is also looking at
-  Kenney.nl art packs for Phase 2.
+- **0.9 ✅**: **Look Lab** (`src/lab.ts`, looks in `data/looks.json`, rules in `src/looks.ts`):
+  all 12 units and towers animating side by side (Walk / Fight / Hurt / Still, tower level
+  1–3, close-up), sliders for size, bounce, speed and sword swing / wing flap, colour pickers.
+  Changes are kept on the phone and used by the game there; Copy gives only the changes, to
+  paste in the chat. Owner is also looking at Kenney.nl art packs for Phase 2 (Castle Kit).
 - **Later**: branching upgrades, sound, more levels, then Phase 2 and Phase 3.
 
 ## From the Gemini prototype

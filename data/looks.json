@@ -1,0 +1,14 @@
+{
+  "knight": { "size": 1, "bounce": 1, "speed": 1, "swing": 1, "colors": { "armor": "#d4d9e0", "tabard": "#2f5d9a", "trim": "#ffd54a" } },
+  "soldier": { "size": 1, "bounce": 1, "speed": 1, "swing": 1, "colors": { "armor": "#d4d9e0", "tabard": "#3d7a3a", "trim": "#ffd54a" } },
+  "hero": { "size": 1, "bounce": 1, "speed": 1, "swing": 1, "colors": { "horse": "#8a5a33", "mane": "#3b2414", "armor": "#d4d9e0", "cloth": "#2f5d9a", "trim": "#ffd54a", "plume": "#c0392b" } },
+  "kobold": { "size": 1, "bounce": 1, "speed": 1, "colors": { "body": "#c0622d", "belly": "#e8a060" } },
+  "brute": { "size": 1, "bounce": 1, "speed": 1, "colors": { "body": "#4f6b8a", "belly": "#8aa4bf" } },
+  "troll": { "size": 1, "bounce": 1, "speed": 1, "colors": { "body": "#6b7d4a", "belly": "#a3b07a" } },
+  "hexling": { "size": 1, "bounce": 1, "speed": 1, "colors": { "body": "#6a3d8f", "belly": "#b58bd6" } },
+  "wyrmling": { "size": 1, "bounce": 1, "speed": 1, "swing": 1, "colors": { "body": "#3f8f5a", "belly": "#a8d98a" } },
+  "archer": { "size": 1, "colors": { "stone": "#c9c2b4", "roof": "#2f7d4f" } },
+  "knights": { "size": 1, "colors": { "stone": "#c9c2b4", "roof": "#2f5d9a", "banner": "#ffd54a" } },
+  "wizard": { "size": 1, "colors": { "stone": "#c9c0d2", "roof": "#5b2d86", "orb": "#c878ff" } },
+  "catapult": { "size": 1, "colors": { "stone": "#c9c2b4", "wood": "#8b5a2b" } }
+}

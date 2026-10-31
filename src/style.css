@@ -310,6 +310,7 @@ button.level.locked {
 
 .card .buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   justify-content: center;
   margin-top: 14px;
@@ -654,4 +655,148 @@ body.studio #banner {
 
 .card .grp input[type='number'] {
   width: 50px;
+}
+
+/* Look Lab */
+body.lab #hud,
+body.lab .call,
+body.lab .heroPill,
+body.lab #specials,
+body.lab #banner,
+body.lab #version {
+  display: none;
+}
+
+#labBar {
+  position: fixed;
+  top: max(6px, env(safe-area-inset-top));
+  left: max(8px, env(safe-area-inset-left));
+  right: calc(min(340px, 44vw) + 12px);
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  z-index: 10;
+}
+
+#labBar button {
+  padding: 7px 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+#labBar button.on,
+#labPanel button.on {
+  border-color: var(--gold);
+  background: linear-gradient(#e0a33a, #b06f1c);
+  color: var(--wood-solid);
+}
+
+#labPanel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(340px, 44vw);
+  padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 12px 12px;
+  background: var(--wood-solid);
+  border-left: 3px solid var(--rim);
+  overflow-y: auto;
+  touch-action: pan-y;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#labBar[hidden],
+#labPanel[hidden] {
+  display: none;
+}
+
+#labPanel select.unit {
+  font: inherit;
+  font-family: Cinzel, serif;
+  font-size: 17px;
+  color: var(--gold);
+  background: #1c130b;
+  border: 2px solid var(--rim);
+  border-radius: 10px;
+  padding: 5px 8px;
+}
+
+#labPanel .row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+#labPanel .lbl {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+#labPanel .slider {
+  display: grid;
+  grid-template-columns: 86px 1fr 48px;
+  align-items: center;
+  gap: 6px;
+}
+
+#labPanel .slider input {
+  width: 100%;
+  accent-color: var(--gold);
+  touch-action: pan-x;
+}
+
+#labPanel .val {
+  font-size: 13px;
+  text-align: right;
+}
+
+#labPanel .changed .lbl,
+#labPanel .changed span {
+  color: var(--gold);
+}
+
+#labPanel .colors {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 10px;
+}
+
+#labPanel .color {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+#labPanel input[type='color'] {
+  width: 34px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid var(--rim);
+  border-radius: 8px;
+  background: none;
+}
+
+#labPanel .reset:disabled {
+  opacity: 0.4;
+}
+
+#labPanel .note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Four levels and four buttons on the level screen. */
+.card:has(.levels) {
+  max-width: 560px;
+}
+
+.card:has(.levels) .buttons button {
+  padding: 10px 18px;
 }

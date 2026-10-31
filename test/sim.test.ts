@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { changesToJson, DEFAULT_LOOKS, lookChanges, LOOK_SLIDERS, looksToJson, mergeLooks, shade, type SliderKey } from '../src/looks';
+import { SPOTS } from '../src/lab';
 import { blankLevel, checkLevel, levelToJson, strokeToRoad } from '../src/studio';
 import { buildPath, distanceToPath, pointAt } from '../src/path';
 import { earnedStars, isUnlocked, loadHeroXp, loadProgress, nextSpecialUpgrade, saveHeroXp, saveStars, specialsSpent, starsToSpend } from '../src/progress';
@@ -584,5 +586,61 @@ describe('level studio', () => {
       expect(back.name).toBe(level.name);
       expect(back.id).toMatch(/^[a-z0-9-]+$/);
     }
+  });
+});
+
+describe('looks', () => {
+  it('every enemy and tower has a look, and the Look Lab has a spot for every look', () => {
+    for (const id of [...Object.keys(BALANCE.enemies), ...Object.keys(BALANCE.towers), 'knight', 'soldier', 'hero']) {
+      expect(DEFAULT_LOOKS[id], id).toBeDefined();
+    }
+    for (const id of Object.keys(DEFAULT_LOOKS)) expect(SPOTS[id], id).toBeDefined();
+  });
+
+  it('data/looks.json holds sensible numbers and #rrggbb colours', () => {
+    for (const look of Object.values(DEFAULT_LOOKS)) {
+      for (const key of Object.keys(LOOK_SLIDERS) as SliderKey[]) {
+        const v = look[key];
+        if (v === undefined) continue;
+        expect(v).toBeGreaterThanOrEqual(LOOK_SLIDERS[key].min);
+        expect(v).toBeLessThanOrEqual(LOOK_SLIDERS[key].max);
+      }
+      for (const c of Object.values(look.colors)) expect(c).toMatch(/^#[0-9a-f]{6}$/);
+    }
+  });
+
+  it('takes only sensible changes from the phone', () => {
+    const merged = mergeLooks(DEFAULT_LOOKS, {
+      hero: { size: 9, colors: { horse: '#FFFFFF', plume: 'red', wings: '#000000' } },
+      kobold: { swing: 2, bounce: 'high' },
+      dragon: { size: 1.2 },
+    });
+    expect(merged.hero.size).toBe(LOOK_SLIDERS.size.max);
+    expect(merged.hero.colors.horse).toBe('#ffffff');
+    expect(merged.hero.colors.plume).toBe(DEFAULT_LOOKS.hero.colors.plume);
+    expect(merged.hero.colors.wings).toBeUndefined();
+    expect(merged.kobold.swing).toBeUndefined();
+    expect(merged.kobold.bounce).toBe(DEFAULT_LOOKS.kobold.bounce);
+    expect(merged.dragon).toBeUndefined();
+    expect(mergeLooks(DEFAULT_LOOKS, 'junk')).toEqual(DEFAULT_LOOKS);
+  });
+
+  it('copies only the changes, and they come back the same', () => {
+    expect(lookChanges(DEFAULT_LOOKS)).toEqual({});
+    const changed = structuredClone(DEFAULT_LOOKS);
+    changed.troll.bounce = 2.5;
+    changed.knight.colors.tabard = '#aa0000';
+    const json = changesToJson(changed);
+    expect(JSON.parse(json)).toEqual({ troll: { bounce: 2.5 }, knight: { colors: { tabard: '#aa0000' } } });
+    expect(mergeLooks(DEFAULT_LOOKS, JSON.parse(json))).toEqual(changed);
+  });
+
+  it('writes looks in the same shape as data/looks.json', () => {
+    expect(JSON.parse(looksToJson(DEFAULT_LOOKS))).toEqual(DEFAULT_LOOKS);
+  });
+
+  it('shades colours darker and lighter', () => {
+    expect(shade('#808080', -0.5)).toBe('#404040');
+    expect(shade('#000000', 0.5)).toBe('#808080');
   });
 });

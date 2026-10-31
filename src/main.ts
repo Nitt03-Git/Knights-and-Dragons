@@ -8,10 +8,11 @@ import { BALANCE, LEVELS } from './data';
 import { fitView, panView, Renderer, toScreen, toWorld, zoomView, type Overlay, type View } from './render';
 import { buyAbility, isUnlocked, setTestStars, TEST_STARS, testStarsOn, loadAbilities, loadHeroXp, loadProgress, loadSpecials, nextSpecialUpgrade, saveHeroXp, saveStars, starsToSpend, upgradeSpecial } from './progress';
 import { Game, STEP } from './sim';
+import { Lab } from './lab';
 import { Studio } from './studio';
 import type { HeroAbility, Level, SpecialKind } from './types';
 
-const VERSION = '0.8';
+const VERSION = '0.9';
 
 /** Towers in the build ring, clockwise from top-left. */
 const BUILD_RING: { type: string; icon: string; label: string; angle: number; soon?: string }[] = [
@@ -76,6 +77,16 @@ const studio = new Studio({
   onExit: () => showLevels(),
 });
 
+const lab = new Lab({
+  canvas,
+  ctx,
+  screen: () => ({ width: fitted.width, height: fitted.height, dpr: fitted.dpr }),
+  showCard: (html, buttons) => showCard(html, buttons),
+  hideCard: () => hideCard(),
+  card: ui.card,
+  onExit: () => showLevels(),
+});
+
 // Testing switch: `?teststars` gives extra stars to try upgrades with, `?teststars=0` takes them away.
 // It is remembered on the phone, so it also works when the game is opened from the home screen.
 {
@@ -118,6 +129,7 @@ function hideCard(): void {
 
 function showLevels(): void {
   studio.close();
+  lab.close();
   paused = true;
   closeMenu();
   const progress = loadProgress();
@@ -138,6 +150,7 @@ function showLevels(): void {
       { text: `🐴 Hero${spend > 0 ? ` · ★ ${spend}` : ''}`, onClick: showHero },
       { text: '✨ Specials', onClick: showSpecials },
       { text: '🛠️ Studio', onClick: () => studio.open() },
+      { text: '🎨 Looks', onClick: () => lab.open() },
     ],
   );
   ui.card.querySelectorAll<HTMLButtonElement>('button.level').forEach((b) => {
@@ -545,7 +558,7 @@ function dragFlagTo(pad: number, sx: number, sy: number): void {
 }
 
 canvas.addEventListener('pointerdown', (e) => {
-  if (studio.active) return;
+  if (studio.active || lab.active) return;
   try {
     canvas.setPointerCapture(e.pointerId);
   } catch {
@@ -567,7 +580,7 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 
 canvas.addEventListener('pointermove', (e) => {
-  if (studio.active) return;
+  if (studio.active || lab.active) return;
   const p = pointers.get(e.pointerId);
   if (!p || !gesture) return;
   const dx = e.clientX - p.x;
@@ -616,7 +629,7 @@ canvas.addEventListener('pointermove', (e) => {
 });
 
 function pointerEnd(e: PointerEvent): void {
-  if (studio.active) return;
+  if (studio.active || lab.active) return;
   if (!pointers.delete(e.pointerId) || !gesture) return;
   if (gesture.kind === 'tap' && e.type === 'pointerup') handleTap(e.clientX, e.clientY);
   if (gesture.kind === 'hero') {
@@ -636,7 +649,7 @@ canvas.addEventListener(
   'wheel',
   (e) => {
     e.preventDefault();
-    if (studio.active) return;
+    if (studio.active || lab.active) return;
     if (placingFlag === null) closeMenu();
     view = zoomView(view, fitted, Math.exp(-e.deltaY * 0.0015), e.clientX, e.clientY);
   },
@@ -717,6 +730,11 @@ function frame(now: number): void {
     requestAnimationFrame(frame);
     return;
   }
+  if (lab.active) {
+    lab.draw(dt);
+    requestAnimationFrame(frame);
+    return;
+  }
   if (!paused) {
     acc += dt * speed;
     while (acc >= STEP) {
@@ -745,7 +763,7 @@ function frame(now: number): void {
 }
 
 if (new URLSearchParams(location.search).has('debug')) {
-  Object.assign(window, { debug: { get game() { return game; }, get view() { return view; }, studio, setPaused: (p: boolean) => (paused = p) } });
+  Object.assign(window, { debug: { get game() { return game; }, get view() { return view; }, studio, lab, setPaused: (p: boolean) => (paused = p) } });
 }
 
 showLevels();

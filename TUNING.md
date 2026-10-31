@@ -128,6 +128,19 @@ you open https://nitt03-git.github.io/Knights-and-Dragons/?teststars=0 . The lev
 shows a note while it's on. Turning it off takes the 50 away again; upgrades already bought
 stay, so stars to spend can then be below zero until you earn more.
 
+## Looks (`looks.json`)
+
+How each unit and tower looks. Easiest to change in the game's **🎨 Looks** screen and paste to
+Claude, but you can also edit the file.
+
+| Setting | What it does |
+|---|---|
+| `size` | How big it is drawn, 1 = normal (0.6 to 1.6). Only the picture: hitting and range stay the same. |
+| `bounce` | How high it bobs while walking or flying (0 to 3). |
+| `speed` | How fast legs, wings and sword move (0.3 to 3). Not how fast it walks: that is `speed` in `balance.json`. |
+| `swing` | How far the sword swings; for the Wyrmling, how far the wings flap (0 to 2.5). |
+| `colors` | Colours as `#rrggbb`. Darker shades (stone sides, horse legs, visors) follow on their own. |
+
 ## Changing a number yourself on GitHub
 
 1. In Chrome, open https://github.com/Nitt03-Git/Knights-and-Dragons/blob/main/data/balance.json
