@@ -8,9 +8,10 @@ import { BALANCE, LEVELS } from './data';
 import { fitView, panView, Renderer, toScreen, toWorld, zoomView, type Overlay, type View } from './render';
 import { buyAbility, isUnlocked, setTestStars, TEST_STARS, testStarsOn, loadAbilities, loadHeroXp, loadProgress, loadSpecials, nextSpecialUpgrade, saveHeroXp, saveStars, starsToSpend, upgradeSpecial } from './progress';
 import { Game, STEP } from './sim';
-import type { HeroAbility, SpecialKind } from './types';
+import { Studio } from './studio';
+import type { HeroAbility, Level, SpecialKind } from './types';
 
-const VERSION = '0.7.2';
+const VERSION = '0.8';
 
 /** Towers in the build ring, clockwise from top-left. */
 const BUILD_RING: { type: string; icon: string; label: string; angle: number; soon?: string }[] = [
@@ -39,8 +40,9 @@ const ui = {
   version: $('version'),
 };
 
-let levelIndex = 0;
-let level = LEVELS[0];
+/** Index of the level being played, or null while testing a Studio draft. */
+let levelIndex: number | null = 0;
+let level: Level = LEVELS[0];
 let game = new Game(level, BALANCE);
 let renderer = new Renderer(ctx, game);
 /** The whole map on screen, and the current (possibly zoomed and moved) view. */
@@ -62,6 +64,17 @@ let shownEnd = false;
 let bannerTimer = 0;
 
 ui.version.textContent = `v${VERSION} · build ${__BUILD__}`;
+
+const studio = new Studio({
+  canvas,
+  ctx,
+  view: () => fitted,
+  showCard: (html, buttons) => showCard(html, buttons),
+  hideCard: () => hideCard(),
+  card: ui.card,
+  onTest: (draft) => startLevel(null, draft),
+  onExit: () => showLevels(),
+});
 
 // Testing switch: `?teststars` gives extra stars to try upgrades with, `?teststars=0` takes them away.
 // It is remembered on the phone, so it also works when the game is opened from the home screen.
@@ -96,6 +109,7 @@ function showCard(html: string, buttons: { text: string; main?: boolean; onClick
     row.append(el);
   }
   ui.overlay.hidden = false;
+  ui.card.scrollTop = 0;
 }
 
 function hideCard(): void {
@@ -103,6 +117,7 @@ function hideCard(): void {
 }
 
 function showLevels(): void {
+  studio.close();
   paused = true;
   closeMenu();
   const progress = loadProgress();
@@ -122,6 +137,7 @@ function showLevels(): void {
     [
       { text: `🐴 Hero${spend > 0 ? ` · ★ ${spend}` : ''}`, onClick: showHero },
       { text: '✨ Specials', onClick: showSpecials },
+      { text: '🛠️ Studio', onClick: () => studio.open() },
     ],
   );
   ui.card.querySelectorAll<HTMLButtonElement>('button.level').forEach((b) => {
@@ -228,7 +244,7 @@ function heroLevelFor(xp: number): number {
 function showPause(): void {
   paused = true;
   showCard(`<h2>Paused</h2><p>${level.name}</p>`, [
-    { text: 'Levels', onClick: showLevels },
+    levelIndex === null ? { text: 'Studio', onClick: () => studio.open() } : { text: 'Levels', onClick: showLevels },
     { text: 'Restart', onClick: restart },
     { text: 'Resume', main: true, onClick: () => { hideCard(); paused = false; } },
   ]);
@@ -239,10 +255,12 @@ function showEnd(): void {
   ui.banner.hidden = true;
   const won = game.phase === 'won';
   const stars = game.stars();
-  const best = won ? saveStars(level.id, stars)[level.id] : 0;
+  // A Studio test run saves no stars.
+  const best = won && levelIndex !== null ? saveStars(level.id, stars)[level.id] : 0;
   const starRow = [0, 1, 2].map((i) => `<span class="${i < stars ? '' : 'off'}">★</span>`).join('');
-  const next = levelIndex + 1 < LEVELS.length ? levelIndex + 1 : null;
-  const buttons = [{ text: 'Levels', onClick: showLevels }, { text: 'Play again', main: !won || next === null, onClick: restart }];
+  const next = levelIndex !== null && levelIndex + 1 < LEVELS.length ? levelIndex + 1 : null;
+  const back = levelIndex === null ? { text: 'Back to Studio', onClick: () => studio.open() } : { text: 'Levels', onClick: showLevels };
+  const buttons = [back, { text: 'Play again', main: !won || next === null, onClick: restart }];
   if (won && next !== null) buttons.push({ text: 'Next level', main: true, onClick: () => startLevel(next) });
   showCard(
     won
@@ -252,9 +270,10 @@ function showEnd(): void {
   );
 }
 
-function startLevel(index: number): void {
+function startLevel(index: number | null, data: Level = LEVELS[index ?? 0]): void {
+  studio.close();
   levelIndex = index;
-  level = LEVELS[index];
+  level = data;
   game = new Game(level, BALANCE, 1, { abilities: loadAbilities(), heroXp: loadHeroXp(), specials: loadSpecials() });
   savedXp = game.hero.xp;
   renderer = new Renderer(ctx, game);
@@ -271,7 +290,7 @@ function startLevel(index: number): void {
 }
 
 function restart(): void {
-  startLevel(levelIndex);
+  startLevel(levelIndex, level);
 }
 
 function goFullscreen(): void {
@@ -526,6 +545,7 @@ function dragFlagTo(pad: number, sx: number, sy: number): void {
 }
 
 canvas.addEventListener('pointerdown', (e) => {
+  if (studio.active) return;
   try {
     canvas.setPointerCapture(e.pointerId);
   } catch {
@@ -547,6 +567,7 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 
 canvas.addEventListener('pointermove', (e) => {
+  if (studio.active) return;
   const p = pointers.get(e.pointerId);
   if (!p || !gesture) return;
   const dx = e.clientX - p.x;
@@ -595,6 +616,7 @@ canvas.addEventListener('pointermove', (e) => {
 });
 
 function pointerEnd(e: PointerEvent): void {
+  if (studio.active) return;
   if (!pointers.delete(e.pointerId) || !gesture) return;
   if (gesture.kind === 'tap' && e.type === 'pointerup') handleTap(e.clientX, e.clientY);
   if (gesture.kind === 'hero') {
@@ -614,6 +636,7 @@ canvas.addEventListener(
   'wheel',
   (e) => {
     e.preventDefault();
+    if (studio.active) return;
     if (placingFlag === null) closeMenu();
     view = zoomView(view, fitted, Math.exp(-e.deltaY * 0.0015), e.clientX, e.clientY);
   },
@@ -689,6 +712,11 @@ let acc = 0;
 function frame(now: number): void {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
+  if (studio.active) {
+    studio.draw();
+    requestAnimationFrame(frame);
+    return;
+  }
   if (!paused) {
     acc += dt * speed;
     while (acc >= STEP) {
@@ -701,7 +729,7 @@ function frame(now: number): void {
       showBanner(`Wave ${ev.wave} of ${game.totalWaves}${ev.bonus ? `<small>+${ev.bonus} gold for calling early</small>` : ''}`);
     }
   }
-  if (game.hero.xp > savedXp) {
+  if (game.hero.xp > savedXp && levelIndex !== null) {
     savedXp = game.hero.xp;
     saveHeroXp(savedXp);
   }
@@ -717,7 +745,7 @@ function frame(now: number): void {
 }
 
 if (new URLSearchParams(location.search).has('debug')) {
-  Object.assign(window, { debug: { get game() { return game; }, get view() { return view; }, setPaused: (p: boolean) => (paused = p) } });
+  Object.assign(window, { debug: { get game() { return game; }, get view() { return view; }, studio, setPaused: (p: boolean) => (paused = p) } });
 }
 
 showLevels();

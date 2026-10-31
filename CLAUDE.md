@@ -26,6 +26,9 @@ Full plan, decisions and milestones: `PLAN.md` (keep it up to date when the owne
   purpose and say why. It is not part of `npm run check` on purpose: the owner may tweak
   `data/balance.json` on GitHub (see `TUNING.md`) and that must never be blocked from
   publishing by the bot. Data sanity checks (ranges, known enemies, pads) do run in `check`.
+- Levels from the Level Studio arrive as pasted JSON: add the object to `data/levels.json`
+  (keep its style, give it a unique `id`), move any stone spot the tests reject, run
+  `npm run check` and `npm run balance`, and tell the owner how the bot did on it.
 - No network calls, no trackers, no external scripts or fonts (fonts are bundled via
   @fontsource). README's privacy section must stay true.
 

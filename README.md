@@ -46,6 +46,22 @@ If it still shows an older build, wait a few minutes: GitHub Pages caches the pa
 - Each enemy that reaches the end of the road costs lives. Win with 18+ lives left for 3 stars.
 - **1×/2×** changes the speed, **❚❚** pauses.
 
+## Level Studio: make your own levels
+
+1. On the level screen, tap **🛠️ Studio**.
+2. **✏️ Road**: drag your finger from where enemies come in to where they leave. Start and end
+   at the map's edge (the dashed line); a green arrow shows the way they walk. Up to 3 roads;
+   tap a road to remove it.
+3. **🪨 Spots**: tap to add stone spots, tap one to remove it. Red ones are too close to a road,
+   another spot or the edge; move them before sending the level.
+4. **🌊 Waves**: name the level, set the starting gold, and edit the waves (which enemies, how
+   many, how fast, after how many seconds, on which road). You can also start over from a blank
+   map or a copy of an existing level. **↩️ Undo** takes back the last change.
+5. **▶️ Test** plays your level right away (no stars or hero XP). Pause → **Studio** to go back.
+6. **📋 Copy**, then paste the text in the chat with Claude: it becomes a real level.
+
+Your draft is kept on the phone, so you can stop and come back later.
+
 ## Privacy
 
 The game collects nothing and contacts nothing besides this website (fonts are included).

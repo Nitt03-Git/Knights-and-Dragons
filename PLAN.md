@@ -142,8 +142,14 @@ Each one is a version the owner can play from the link.
   visible spear at the nearest flyer within 150 every 1.5 s for double damage, even while
   fighting. Scattered volleys land near where you aim (within 260, spread apart) instead of
   anywhere on the road. The volley circle grows clearly: 70, 80, 90, 105, 125.
-- **0.8**: Level Studio: draw a road with a finger, place build spots, set waves, then
-  "Copy level" and paste it into the chat so Claude adds it to `data/levels.json`.
+- **0.8 ✅**: **Level Studio** (`src/studio.ts`): draw up to 3 roads with a finger (ends near the
+  map edge are pushed off the map), tap to place/remove stone spots (red when breaking the
+  level rules), edit name, start gold and waves, start from blank or a copy of a level, Undo,
+  Test (plays the draft; no stars or XP), Copy (JSON for `data/levels.json`). Draft kept on the
+  phone.
+- **0.9**: **Look Lab**: every unit animating side by side with sliders (size, bounce, swing
+  speed, colours); "Copy" the settings to paste in the chat. Owner is also looking at
+  Kenney.nl art packs for Phase 2.
 - **Later**: branching upgrades, sound, more levels, then Phase 2 and Phase 3.
 
 ## From the Gemini prototype

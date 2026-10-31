@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { blankLevel, checkLevel, levelToJson, strokeToRoad } from '../src/studio';
 import { buildPath, distanceToPath, pointAt } from '../src/path';
 import { earnedStars, isUnlocked, loadHeroXp, loadProgress, nextSpecialUpgrade, saveHeroXp, saveStars, specialsSpent, starsToSpend } from '../src/progress';
 import { damageAfterDefence, Game, WORLD_H, WORLD_W, type Tower } from '../src/sim';
@@ -525,5 +526,40 @@ describe('specials', () => {
     expect(nextSpecialUpgrade('reinforce', specials, BALANCE)).toEqual({ kind: 'level', cost: R.upgradeCost });
     expect(nextSpecialUpgrade('volley', specials, BALANCE)).toBeNull();
     expect(nextSpecialUpgrade('volley', { ...specials, volley: { level: 5, extra: false } }, BALANCE)).toEqual({ kind: 'extra', cost: V.extraCost });
+  });
+});
+
+describe('level studio', () => {
+  it('turns a finger stroke into a road that starts and ends off the map', () => {
+    const stroke: [number, number][] = [];
+    for (let x = 30; x <= 1570; x += 7) stroke.push([x, 450 + Math.sin(x / 200) * 150]);
+    const road = strokeToRoad(stroke);
+    expect(road[0][0]).toBeLessThan(0);
+    expect(road[road.length - 1][0]).toBeGreaterThan(WORLD_W);
+    expect(road.length).toBeLessThan(stroke.length / 3);
+    expect(road.every(([x, y]) => Number.isInteger(x) && Number.isInteger(y))).toBe(true);
+  });
+
+  it('leaves ends in the middle of the map where they are', () => {
+    const road = strokeToRoad([[400, 400], [600, 420], [800, 450]]);
+    expect(road[0]).toEqual([400, 400]);
+    expect(road[road.length - 1]).toEqual([800, 450]);
+  });
+
+  it('marks stone spots that break the rules, like the level tests do', () => {
+    const level = { ...blankLevel(), paths: [{ points: [[-140, 450], [1740, 450]] as [number, number][] }], pads: [[800, 460], [800, 600], [850, 610], [20, 300], [400, 300]] as [number, number][] };
+    expect(checkLevel(level).spots).toEqual(['road', 'crowded', 'crowded', 'edge', 'ok']);
+    expect(checkLevel(blankLevel()).blocking.length).toBeGreaterThan(0);
+  });
+
+  it('copies levels in the same shape as data/levels.json', () => {
+    for (const level of LEVELS) {
+      const back = JSON.parse(levelToJson(level));
+      expect(back.paths).toEqual(level.paths);
+      expect(back.pads).toEqual(level.pads);
+      expect(back.waves).toEqual(level.waves);
+      expect(back.name).toBe(level.name);
+      expect(back.id).toMatch(/^[a-z0-9-]+$/);
+    }
   });
 });
