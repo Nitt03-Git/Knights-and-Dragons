@@ -30,6 +30,10 @@ If it still shows an older build, wait a few minutes: GitHub Pages caches the pa
 - To move the knights, drag them (or their flag) to another part of the road. Or tap their
   hall, then **🚩 Move flag**, then tap the road inside the blue circle.
 - Pinch to zoom in and out; drag the map to look around when zoomed in.
+- **Specials** (round buttons bottom-left): 🛡️ Reinforcements, then tap the road, brings two
+  soldiers for a while; 🏹 Arrow Volley, then tap anywhere, rains arrows on that spot. Each
+  shows a countdown while it recharges. Upgrade them with stars: **✨ Specials** on the level
+  screen.
 - Your **hero**, a knight on a horse: tap it, then tap where it should ride (or drag it
   there). The 🐴 button bottom-left shows its level, health and experience, and also selects
   it. Every enemy the hero defeats gives experience, kept between battles; new levels (up
@@ -45,8 +49,8 @@ If it still shows an older build, wait a few minutes: GitHub Pages caches the pa
 ## Privacy
 
 The game collects nothing and contacts nothing besides this website (fonts are included).
-It needs no permissions. Your stars, hero abilities and hero experience are stored only in
-your phone's browser.
+It needs no permissions. Your stars, upgrades and hero experience are stored only in your
+phone's browser.
 
 ## Building (for developers)
 

@@ -70,6 +70,26 @@ the hero's own numbers above. Now 10 levels: 2 at 90 XP, 3 at 180, 4 at 330, 5 a
 
 Each level in `levels.json` can also set `"heroStart": [x, y]`, where the hero begins.
 
+## Specials (`balance.json` → `specials`)
+
+Both specials start at level 1 and are upgraded with stars on the Specials screen.
+
+| Name | What it does | Now |
+|---|---|---|
+| `cooldown` | Seconds before it can be used again | 25 / 45 |
+| `upgradeCost` | Stars for each next level (2 to 5) | 3 |
+| `extraCost` | Stars for the extra, once at level 5 | 5 |
+| `extraName` | Name of the extra | Sky spears / Scattered volleys |
+
+**Reinforcements** (`reinforce`): `count` soldiers (2) stay `duration` seconds (15) on the
+road, walk at `speed`, strike every `attackCooldown` seconds and hold `holds` enemies each.
+`levels` gives each level's `hp`, `damage` and `armor`. With the extra they also hit flyers
+within `skyReach` (80).
+
+**Arrow Volley** (`volley`): lands `delay` seconds (0.8) after the tap. `levels` gives each
+level's `damage` and `radius` (how big the circle is). The extra adds `extraSpots` (3) small
+volleys of size `extraRadius` (45) on random spots of the road.
+
 ## Enemies (`balance.json` → `enemies`)
 
 | Name | What it does |

@@ -98,9 +98,52 @@ export interface HeroSpec {
 
 export type HeroAbility = 'rally' | 'stomp';
 
+/** Specials: abilities the player triggers during a battle, then waits for them to recharge. */
+export type SpecialKind = 'reinforce' | 'volley';
+
+/** How far the player has upgraded a special: level 1–5, and the extra (bought at level 5). */
+export interface SpecialProgress {
+  level: number;
+  extra: boolean;
+}
+
+export interface ReinforceSpec {
+  name: string;
+  /** Seconds before it can be used again. */
+  cooldown: number;
+  /** Seconds the soldiers stay. */
+  duration: number;
+  count: number;
+  speed: number;
+  /** Seconds between sword blows. */
+  attackCooldown: number;
+  holds: number;
+  upgradeCost: number;
+  extraCost: number;
+  extraName: string;
+  /** With the extra: soldiers also hit flyers within this distance. */
+  skyReach: number;
+  levels: { hp: number; damage: [number, number]; armor: number }[];
+}
+
+export interface VolleySpec {
+  name: string;
+  cooldown: number;
+  /** Seconds between the tap and the arrows landing. */
+  delay: number;
+  upgradeCost: number;
+  extraCost: number;
+  extraName: string;
+  /** With the extra: this many more small volleys land on random spots of the road. */
+  extraSpots: number;
+  extraRadius: number;
+  levels: { damage: number; radius: number }[];
+}
+
 export interface Balance {
   rules: Rules;
   hero: HeroSpec;
+  specials: { reinforce: ReinforceSpec; volley: VolleySpec };
   towers: Record<string, TowerSpec>;
   enemies: Record<string, EnemySpec>;
 }

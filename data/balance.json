@@ -17,6 +17,30 @@
     "rally": {"name": "Rallying Banner", "cost": 2, "radius": 160, "hpBoost": 0.2},
     "stomp": {"name": "Thundering Hooves", "cost": 2, "every": 15, "radius": 90, "damage": 35}
   },
+  "specials": {
+    "reinforce": {
+      "name": "Reinforcements", "cooldown": 25, "duration": 15, "count": 2, "speed": 90, "attackCooldown": 1.0, "holds": 1,
+      "upgradeCost": 3, "extraCost": 5, "extraName": "Sky spears", "skyReach": 80,
+      "levels": [
+        {"hp": 50, "damage": [3, 5], "armor": 0.1},
+        {"hp": 60, "damage": [4, 6], "armor": 0.15},
+        {"hp": 70, "damage": [5, 7], "armor": 0.2},
+        {"hp": 80, "damage": [6, 9], "armor": 0.25},
+        {"hp": 95, "damage": [7, 11], "armor": 0.3}
+      ]
+    },
+    "volley": {
+      "name": "Arrow Volley", "cooldown": 45, "delay": 0.8,
+      "upgradeCost": 3, "extraCost": 5, "extraName": "Scattered volleys", "extraSpots": 3, "extraRadius": 45,
+      "levels": [
+        {"damage": 40, "radius": 70},
+        {"damage": 50, "radius": 75},
+        {"damage": 60, "radius": 80},
+        {"damage": 72, "radius": 85},
+        {"damage": 85, "radius": 90}
+      ]
+    }
+  },
   "towers": {
     "archer": {
       "name": "Bowmen Tower",

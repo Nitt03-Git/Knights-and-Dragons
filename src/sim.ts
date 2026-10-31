@@ -2,7 +2,7 @@
 // so the same game can run in tests, at 2x speed, or behind any art style.
 import { buildPath, pointAt, type Path } from './path';
 import { makeRng } from './rng';
-import type { Balance, DamageType, EnemySpec, HeroAbility, Level, TowerLevel } from './types';
+import type { Balance, DamageType, EnemySpec, HeroAbility, Level, SpecialKind, SpecialProgress, TowerLevel } from './types';
 
 /** World size in units. Levels are drawn in this space and the screen scales it to fit. */
 export const WORLD_W = 1600;
@@ -43,7 +43,7 @@ export type KnightState = 'idle' | 'walking' | 'fighting' | 'dead';
 
 export interface Knight {
   id: number;
-  /** Pad of the hall it belongs to. */
+  /** Pad of the hall it belongs to; -1 for soldiers brought by Reinforcements. */
   pad: number;
   slot: number;
   x: number;
@@ -79,6 +79,30 @@ export interface Hero {
   /** Experience earned so far (kept between battles), and the level it brought (1 = first). */
   xp: number;
   level: number;
+}
+
+/** A soldier brought by Reinforcements: fights like a knight, leaves after a while. */
+export interface Soldier extends Knight {
+  post: { x: number; y: number };
+  leavesIn: number;
+}
+
+/** An Arrow Volley on its way down. */
+export interface Strike {
+  x: number;
+  y: number;
+  radius: number;
+  damage: number;
+  /** Seconds until the arrows land, and the total wait (for drawing). */
+  left: number;
+  delay: number;
+}
+
+/** What the player brings into a battle: hero abilities and XP, and how far each special is upgraded. */
+export interface GameOptions {
+  abilities?: HeroAbility[];
+  heroXp?: number;
+  specials?: Partial<Record<SpecialKind, SpecialProgress>>;
 }
 
 /** Anything that holds enemies in place and gets hit by them. */
@@ -130,7 +154,8 @@ export type GameEvent =
   | { kind: 'leak'; x: number; y: number; lives: number }
   | { kind: 'wave'; wave: number; bonus: number }
   | { kind: 'boom'; x: number; y: number; radius: number; stomp?: boolean }
-  | { kind: 'levelUp'; x: number; y: number; level: number };
+  | { kind: 'levelUp'; x: number; y: number; level: number }
+  | { kind: 'spear'; x: number; y: number; tx: number; ty: number };
 
 interface Spawner {
   enemy: string;
@@ -173,8 +198,18 @@ export class Game {
   private holders = new Map<number, Holder>();
   readonly hero: Hero;
   readonly abilities: ReadonlySet<HeroAbility>;
+  readonly specials: Record<SpecialKind, SpecialProgress>;
+  /** Seconds until each special can be used again (0 = ready). */
+  specialIn: Record<SpecialKind, number> = { reinforce: 0, volley: 0 };
+  soldiers: Soldier[] = [];
+  strikes: Strike[] = [];
 
-  constructor(readonly level: Level, readonly balance: Balance, seed = 1, abilities: HeroAbility[] = [], heroXp = 0) {
+  constructor(readonly level: Level, readonly balance: Balance, seed = 1, options: GameOptions = {}) {
+    const { abilities = [], heroXp = 0 } = options;
+    this.specials = {
+      reinforce: options.specials?.reinforce ?? { level: 1, extra: false },
+      volley: options.specials?.volley ?? { level: 1, extra: false },
+    };
     this.paths = level.paths.map((p) => buildPath(p.points));
     this.pads = level.pads.map(([x, y]) => ({ x, y }));
     this.towers = level.pads.map(() => null);
@@ -330,6 +365,61 @@ export class Game {
     return true;
   }
 
+  /** Reinforcements' stats at the level the player bought. */
+  soldierStats() {
+    const spec = this.balance.specials.reinforce;
+    return spec.levels[Math.min(spec.levels.length, this.specials.reinforce.level) - 1];
+  }
+
+  /** Arrow Volley's damage and size at the level the player bought. */
+  volleyStats() {
+    const spec = this.balance.specials.volley;
+    return spec.levels[Math.min(spec.levels.length, this.specials.volley.level) - 1];
+  }
+
+  /** Where Reinforcements would stand for a tap at (x, y): the nearest road within reach, or null. */
+  reinforceSpot(x: number, y: number): Rally | null {
+    const spot = this.nearestRoad((s) => Math.hypot(s.x - x, s.y - y));
+    return spot && Math.hypot(spot.x - x, spot.y - y) <= FLAG_SNAP ? spot : null;
+  }
+
+  /** Brings soldiers to the road near (x, y). False if not ready or not on the road. */
+  callReinforcements(x: number, y: number): boolean {
+    const spec = this.balance.specials.reinforce;
+    const spot = this.reinforceSpot(x, y);
+    if (!spot || this.specialIn.reinforce > 0 || this.isOver()) return false;
+    const stats = this.soldierStats();
+    for (let slot = 0; slot < spec.count; slot++) {
+      // Side by side across the road.
+      const post = pointAt(this.paths[spot.path], spot.d, (slot - (spec.count - 1) / 2) * 26);
+      this.soldiers.push({
+        id: this.nextId++, pad: -1, slot, x: post.x, y: post.y, hp: stats.hp, state: 'idle', target: null, holding: [],
+        cooldown: 0, respawnIn: 0, hitAge: 9, post, leavesIn: spec.duration,
+      });
+    }
+    this.specialIn.reinforce = spec.cooldown;
+    return true;
+  }
+
+  /** Sends an Arrow Volley at (x, y) (plus scattered ones with the extra). False if not ready. */
+  callVolley(x: number, y: number): boolean {
+    const spec = this.balance.specials.volley;
+    if (this.specialIn.volley > 0 || this.isOver()) return false;
+    const stats = this.volleyStats();
+    this.strikes.push({ x, y, radius: stats.radius, damage: stats.damage, left: spec.delay, delay: spec.delay });
+    if (this.specials.volley.extra) {
+      for (let i = 0; i < spec.extraSpots; i++) {
+        // A random spot on a road, inside the map.
+        const path = this.paths[Math.floor(this.rng() * this.paths.length)];
+        const inside = path.samples.filter((s) => s.x > 40 && s.x < WORLD_W - 40 && s.y > 40 && s.y < WORLD_H - 40);
+        const s = inside[Math.floor(this.rng() * inside.length)];
+        if (s) this.strikes.push({ x: s.x, y: s.y, radius: spec.extraRadius, damage: stats.damage, left: spec.delay, delay: spec.delay });
+      }
+    }
+    this.specialIn.volley = spec.cooldown;
+    return true;
+  }
+
   /** The hero's health, sword and armor at its current level. */
   heroStats(): { hp: number; damage: [number, number]; armor: number } {
     const spec = this.balance.hero;
@@ -375,11 +465,13 @@ export class Game {
     this.holders.clear();
     for (const t of this.towers) if (t) for (const k of t.knights) this.holders.set(k.id, k);
     this.holders.set(this.hero.id, this.hero);
+    for (const k of this.soldiers) this.holders.set(k.id, k);
 
     this.updateWaves(dt);
     this.updateEnemies(dt);
     this.updateTowers(dt);
     this.updateHero(dt);
+    this.updateSpecials(dt);
     this.updateProjectiles(dt);
     this.enemies = this.enemies.filter((e) => e.alive);
     this.projectiles = this.projectiles.filter((p) => !p.done);
@@ -552,6 +644,45 @@ export class Game {
     k.y += (dy / len) * step;
   }
 
+  private updateSpecials(dt: number): void {
+    for (const kind of ['reinforce', 'volley'] as const) this.specialIn[kind] = Math.max(0, this.specialIn[kind] - dt);
+
+    const spec = this.balance.specials.reinforce;
+    const stats = this.soldierStats();
+    const unit = { holds: spec.holds, speed: spec.speed, regen: 0, hp: stats.hp };
+    for (const k of this.soldiers) {
+      k.hitAge += dt;
+      k.leavesIn -= dt;
+      if (k.state === 'dead') continue;
+      k.holding = k.holding.filter((id) => {
+        const e = this.enemyById.get(id);
+        return !!e?.alive && e.heldBy === k.id;
+      });
+      this.fight(k, unit, stats.damage, spec.attackCooldown, 'physical', k.post, ENGAGE_RANGE, dt);
+      // Sky spears: when not busy on the road, hit flyers passing close by.
+      if (this.specials.reinforce.extra && k.state !== 'fighting') {
+        k.cooldown -= dt;
+        const flyer = this.enemies.find((e) => e.alive && e.spec.flying && Math.hypot(e.x - k.x, e.y - k.y) <= spec.skyReach);
+        if (flyer && k.cooldown <= 0) {
+          this.hit(flyer, this.roll(stats.damage), 'physical');
+          k.cooldown = spec.attackCooldown;
+          k.hitAge = 9;
+          this.events.push({ kind: 'spear', x: k.x, y: k.y, tx: flyer.x, ty: flyer.y - FLY_HEIGHT - flyer.spec.size });
+        }
+      }
+    }
+    for (const k of this.soldiers) if (k.leavesIn <= 0 && k.state !== 'dead') this.release(k);
+    this.soldiers = this.soldiers.filter((k) => k.leavesIn > 0 && k.state !== 'dead');
+
+    for (const st of this.strikes) {
+      st.left -= dt;
+      if (st.left > 0) continue;
+      for (const e of this.enemies) if (e.alive && Math.hypot(e.x - st.x, e.y - st.y) <= st.radius) this.hit(e, st.damage, 'physical');
+      this.events.push({ kind: 'boom', x: st.x, y: st.y, radius: st.radius });
+    }
+    this.strikes = this.strikes.filter((st) => st.left > 0);
+  }
+
   private updateHero(dt: number): void {
     const h = this.hero;
     const spec = this.balance.hero;
@@ -677,6 +808,10 @@ export class Game {
     if (k === this.hero) {
       armor = this.heroStats().armor;
       respawn = this.balance.hero.respawn;
+    } else if ((k as Knight).pad === -1) {
+      armor = this.soldierStats().armor;
+      respawn = 0;
+      if (this.inRally(k)) boost = 1 + this.balance.hero.rally.hpBoost;
     } else {
       const t = this.towers[(k as Knight).pad];
       const unit = t && this.towerLevel(t.type, t.level)?.unit;

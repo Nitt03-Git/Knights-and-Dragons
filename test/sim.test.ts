@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildPath, distanceToPath, pointAt } from '../src/path';
-import { earnedStars, isUnlocked, loadHeroXp, loadProgress, saveHeroXp, saveStars, starsToSpend } from '../src/progress';
+import { earnedStars, isUnlocked, loadHeroXp, loadProgress, nextSpecialUpgrade, saveHeroXp, saveStars, specialsSpent, starsToSpend } from '../src/progress';
 import { damageAfterDefence, Game, WORLD_H, WORLD_W, type Tower } from '../src/sim';
 import type { HeroAbility } from '../src/types';
 import { BALANCE, LEVELS } from './bot';
@@ -233,6 +233,23 @@ describe('data/balance.json makes sense', () => {
     expect(r.waveGap).toBeGreaterThan(0);
   });
 
+  it('specials have 5 levels that grow', () => {
+    const { reinforce, volley } = BALANCE.specials;
+    for (const spec of [reinforce, volley]) {
+      expect(spec.levels.length).toBe(5);
+      expect(spec.cooldown).toBeGreaterThan(0);
+    }
+    for (const l of reinforce.levels) {
+      expect(l.hp).toBeGreaterThan(0);
+      expect(range(l.damage)).toBe(true);
+      expect(share(l.armor)).toBe(true);
+    }
+    for (const l of volley.levels) {
+      expect(l.damage).toBeGreaterThan(0);
+      expect(l.radius).toBeGreaterThan(0);
+    }
+  });
+
   it('hero levels grow', () => {
     let prev = { xp: 0, hp: BALANCE.hero.hp };
     for (const l of BALANCE.hero.levels) {
@@ -314,7 +331,7 @@ describe('hero', () => {
 
   it('stomps only once bought, every few seconds, for its damage', () => {
     const stomps = (abilities: HeroAbility[]) => {
-      const g = new Game(wave('troll', 1, 1), BALANCE, 1, abilities);
+      const g = new Game(wave('troll', 1, 1), BALANCE, 1, { abilities });
       g.callWave();
       let n = 0;
       for (let i = 0; i < 60 * 60 && !g.isOver(); i++) {
@@ -326,7 +343,7 @@ describe('hero', () => {
     };
     expect(stomps([])).toBe(0);
     expect(stomps(['stomp'])).toBeGreaterThan(0);
-    const g = new Game(wave('troll', 1, 1), BALANCE, 1, ['stomp']);
+    const g = new Game(wave('troll', 1, 1), BALANCE, 1, { abilities: ['stomp'] });
     g.callWave();
     const troll = () => g.enemies[0];
     while (!g.events.some((e) => e.kind === 'boom' && e.stomp)) {
@@ -340,7 +357,7 @@ describe('hero', () => {
 
   it('rally makes nearby knights last longer', () => {
     const lostHp = (abilities: HeroAbility[]) => {
-      const g = new Game(wave('brute', 1, 1), BALANCE, 1, abilities);
+      const g = new Game(wave('brute', 1, 1), BALANCE, 1, { abilities });
       g.build(0, 'knights');
       const t = g.towers[0]!;
       for (let i = 0; i < 60 * 5; i++) g.step();
@@ -406,7 +423,7 @@ describe('hero experience', () => {
 describe('hero experience kept between battles', () => {
   it('a battle starts at the level the saved XP brings, at full health', () => {
     const xp = BALANCE.hero.levels[2].xp + 5;
-    const g = new Game(LEVELS[0], BALANCE, 1, [], xp);
+    const g = new Game(LEVELS[0], BALANCE, 1, { heroXp: xp });
     expect(g.hero.level).toBe(4);
     expect(g.hero.xp).toBe(xp);
     expect(g.hero.hp).toBe(BALANCE.hero.levels[2].hp);
@@ -416,5 +433,78 @@ describe('hero experience kept between battles', () => {
   it('the hero XP survives having no storage', () => {
     expect(loadHeroXp()).toBe(0);
     expect(() => saveHeroXp(100)).not.toThrow();
+  });
+});
+
+describe('specials', () => {
+  const level = LEVELS[0];
+  const wave = (enemy: string, count: number, interval: number) => ({ ...level, waves: [{ groups: [{ enemy, count, interval }] }] });
+  const R = BALANCE.specials.reinforce;
+  const V = BALANCE.specials.volley;
+
+  it('reinforcements only stand on the road, hold enemies, and leave after their time', () => {
+    const g = new Game(wave('brute', 4, 1), BALANCE);
+    expect(g.callReinforcements(800, 880)).toBe(false); // grass, far from the road
+    const spot = pointAt(g.paths[0], 500);
+    expect(g.callReinforcements(spot.x, spot.y)).toBe(true);
+    expect(g.soldiers.length).toBe(R.count);
+    expect(g.callReinforcements(spot.x, spot.y)).toBe(false); // recharging
+    g.callWave();
+    let held = false;
+    for (let i = 0; i < 60 * (R.duration + 1); i++) {
+      g.step();
+      held ||= g.enemies.some((e) => g.soldiers.some((k) => k.id === e.heldBy));
+    }
+    expect(held).toBe(true);
+    expect(g.soldiers.length).toBe(0);
+    for (let i = 0; i < 60 * R.cooldown; i++) g.step();
+    expect(g.specialIn.reinforce).toBe(0);
+  });
+
+  it('a volley hits everything in its circle, flyers too, after a short wait', () => {
+    const g = new Game(wave('wyrmling', 1, 1), BALANCE);
+    g.moveHero(100, 850);
+    g.callWave();
+    for (let i = 0; i < 60 * 6; i++) g.step();
+    const w = g.enemies[0];
+    g.callVolley(w.x, w.y);
+    const hp = w.hp;
+    for (let i = 0; i < 60 * V.delay + 2; i++) g.step();
+    expect(hp - w.hp).toBeCloseTo(V.levels[0].damage);
+  });
+
+  it('the volley extra adds small volleys on the road; the level sets damage and size', () => {
+    const g = new Game(level, BALANCE, 1, { specials: { volley: { level: 5, extra: true } } });
+    g.callVolley(800, 450);
+    expect(g.strikes.length).toBe(1 + V.extraSpots);
+    expect(g.strikes[0]).toMatchObject({ damage: V.levels[4].damage, radius: V.levels[4].radius });
+    for (const st of g.strikes.slice(1)) expect(distanceToPath(g.paths[0], st.x, st.y)).toBeLessThan(1);
+  });
+
+  it('only soldiers with the extra hit flyers', () => {
+    const hits = (extra: boolean) => {
+      const g = new Game(wave('wyrmling', 5, 1.5), BALANCE, 1, { specials: { reinforce: { level: 1, extra } } });
+      g.moveHero(100, 850);
+      const spot = pointAt(g.paths[0], 450);
+      g.callReinforcements(spot.x, spot.y);
+      g.callWave();
+      let n = 0;
+      for (let i = 0; i < 60 * R.duration; i++) {
+        g.step();
+        n += g.events.filter((e) => e.kind === 'spear').length;
+        g.events.length = 0;
+      }
+      return n;
+    };
+    expect(hits(false)).toBe(0);
+    expect(hits(true)).toBeGreaterThan(0);
+  });
+
+  it('upgrades cost stars', () => {
+    const specials = { reinforce: { level: 3, extra: false }, volley: { level: 5, extra: true } };
+    expect(specialsSpent(specials, BALANCE)).toBe(2 * R.upgradeCost + 4 * V.upgradeCost + V.extraCost);
+    expect(nextSpecialUpgrade('reinforce', specials, BALANCE)).toEqual({ kind: 'level', cost: R.upgradeCost });
+    expect(nextSpecialUpgrade('volley', specials, BALANCE)).toBeNull();
+    expect(nextSpecialUpgrade('volley', { ...specials, volley: { level: 5, extra: false } }, BALANCE)).toEqual({ kind: 'extra', cost: V.extraCost });
   });
 });

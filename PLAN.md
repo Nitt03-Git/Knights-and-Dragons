@@ -127,7 +127,16 @@ Each one is a version the owner can play from the link.
   step of the old 5; reaching the old top strength (now level 9) takes 3× the XP (1650).
   Thresholds 90/180/330/480/720/960/1300/1650/2100. A battle gives roughly 100–250 XP with
   Roch left where he starts, more when he is moved into the fights.
-- **0.7**: Level Studio: draw a road with a finger, place build spots, set waves, then
+- **0.7 ✅**: **Specials** (owner chose them before the Level Studio), usable from the first
+  battle, upgraded with stars on the new Specials screen (levels 2–5 cost 3 ★ each, the extra
+  at level 5 costs 5 ★):
+  **Reinforcements** (shield button, then tap the road): 2 soldiers for 15 s, ready every 25 s;
+  levels add health, damage and armor; extra **Sky spears**: they also hit flyers nearby.
+  **Arrow Volley** (bow button, then tap anywhere): after 0.8 s, damage to every enemy in a
+  circle (flyers too), ready every 45 s; levels add damage and size; extra **Scattered
+  volleys**: 3 more small volleys on random spots of the road.
+  Note: fully upgrading both costs 34 ★ (+4 for the hero); 3 levels give at most 9.
+- **0.8**: Level Studio: draw a road with a finger, place build spots, set waves, then
   "Copy level" and paste it into the chat so Claude adds it to `data/levels.json`.
 - **Later**: branching upgrades, sound, more levels, then Phase 2 and Phase 3.
 
@@ -142,10 +151,10 @@ wording borrowed from other games.
 ## Owner's wishes for later
 
 - Knights should look very different (Phase 2 art), not just recoloured shapes.
-- Specials (abilities you trigger, e.g. a rain of arrows) at some point.
 - Difficulty gets retuned once the hero (and specials) are in.
 
 ## Open questions for the owner
 
+- Stars: upgrades cost far more than 3 levels can give; more levels, cheaper upgrades, or both?
 - Ability prices after testing (planned 5 ★ and 10 ★; 3 levels give at most 9 ★).
 - How many levels for a first "complete" version?

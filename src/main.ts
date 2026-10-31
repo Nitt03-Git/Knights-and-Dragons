@@ -6,11 +6,11 @@ import '@fontsource/fredoka/latin-700.css';
 import './style.css';
 import { BALANCE, LEVELS } from './data';
 import { fitView, panView, Renderer, toScreen, toWorld, zoomView, type Overlay, type View } from './render';
-import { buyAbility, isUnlocked, loadAbilities, loadHeroXp, loadProgress, saveHeroXp, saveStars, starsToSpend } from './progress';
+import { buyAbility, isUnlocked, loadAbilities, loadHeroXp, loadProgress, loadSpecials, nextSpecialUpgrade, saveHeroXp, saveStars, starsToSpend, upgradeSpecial } from './progress';
 import { Game, STEP } from './sim';
-import type { HeroAbility } from './types';
+import type { HeroAbility, SpecialKind } from './types';
 
-const VERSION = '0.6.3';
+const VERSION = '0.7';
 
 /** Towers in the build ring, clockwise from top-left. */
 const BUILD_RING: { type: string; icon: string; label: string; angle: number; soon?: string }[] = [
@@ -31,6 +31,7 @@ const ui = {
   pause: $<HTMLButtonElement>('pause'),
   callWave: $<HTMLButtonElement>('callWave'),
   heroPill: $<HTMLButtonElement>('heroPill'),
+  special: { reinforce: $<HTMLButtonElement>('spReinforce'), volley: $<HTMLButtonElement>('spVolley') } as Record<SpecialKind, HTMLButtonElement>,
   menu: $('menu'),
   banner: $('banner'),
   overlay: $('overlay'),
@@ -53,6 +54,8 @@ let placingFlag: number | null = null;
 /** The hero is selected and waits for a tap on where to ride; or is being dragged there. */
 let heroSelected = false;
 let heroDrag: { x: number; y: number } | null = null;
+/** The special waiting for a tap on the map, if any. */
+let armedSpecial: SpecialKind | null = null;
 /** The hero XP last written to the phone; saved again whenever it grows. */
 let savedXp = 0;
 let shownEnd = false;
@@ -103,12 +106,15 @@ function showLevels(): void {
     return `<button class="pill level${open ? '' : ' locked'}" data-level="${i}" ${open ? '' : 'disabled'}>
       <span class="num">${open ? i + 1 : '🔒'}</span><span class="name">${l.name}</span><span class="stars">${starRow}</span></button>`;
   }).join('');
-  const spend = starsToSpend(progress, loadAbilities(), BALANCE.hero);
+  const spend = starsToSpend(progress, loadAbilities(), BALANCE.hero, loadSpecials(), BALANCE);
   showCard(
     `<h1>Knights &amp; Dragons</h1>
      <p>Tap a stone spot to build. Bowmen shoot, knights hold the road, wizards ignore armor, catapults hit groups. Pinch to zoom.</p>
      <div class="levels">${cards}</div>`,
-    [{ text: `🐴 Hero${spend > 0 ? ` · ★ ${spend}` : ''}`, onClick: showHero }],
+    [
+      { text: `🐴 Hero${spend > 0 ? ` · ★ ${spend}` : ''}`, onClick: showHero },
+      { text: '✨ Specials', onClick: showSpecials },
+    ],
   );
   ui.card.querySelectorAll<HTMLButtonElement>('button.level').forEach((b) => {
     b.onclick = () => {
@@ -128,7 +134,7 @@ function showHero(): void {
   let armed: HeroAbility | null = null;
   const render = () => {
     const owned = loadAbilities();
-    const spend = starsToSpend(loadProgress(), owned, hero);
+    const spend = starsToSpend(loadProgress(), owned, hero, loadSpecials(), BALANCE);
     const rows = (['rally', 'stomp'] as HeroAbility[]).map((a) => {
       const spec = hero[a];
       const text = ABILITY_TEXT[a].replace('20%', `${Math.round(hero.rally.hpBoost * 100)}%`).replace('15 seconds', `${hero.stomp.every} seconds`).replace('35 damage', `${hero.stomp.damage} damage`);
@@ -150,10 +156,54 @@ function showHero(): void {
       b.onclick = () => {
         const a = b.dataset.buy as HeroAbility;
         if (armed === a) {
-          buyAbility(a, hero);
+          buyAbility(a, BALANCE);
           armed = null;
         } else {
           armed = a;
+        }
+        render();
+      };
+    });
+  };
+  render();
+}
+
+function showSpecials(): void {
+  let armed: SpecialKind | null = null;
+  const render = () => {
+    const specials = loadSpecials();
+    const spend = starsToSpend(loadProgress(), loadAbilities(), BALANCE.hero, specials, BALANCE);
+    const rows = (['reinforce', 'volley'] as SpecialKind[]).map((k) => {
+      const spec = BALANCE.specials[k];
+      const s = specials[k];
+      const next = nextSpecialUpgrade(k, specials, BALANCE);
+      const now = k === 'reinforce'
+        ? (() => { const l = spec.levels[s.level - 1] as (typeof BALANCE.specials.reinforce.levels)[number]; return `${BALANCE.specials.reinforce.count} soldiers for ${BALANCE.specials.reinforce.duration}s: ${l.hp} health, ${l.damage[0]}–${l.damage[1]} damage, ${Math.round(l.armor * 100)}% armor`; })()
+        : (() => { const l = spec.levels[s.level - 1] as (typeof BALANCE.specials.volley.levels)[number]; return `${l.damage} damage to every enemy in the circle (size ${l.radius})`; })();
+      const extraText = k === 'reinforce' ? 'soldiers can also hit flyers' : `${BALANCE.specials.volley.extraSpots} more small volleys on random spots of the road`;
+      const label = !next ? '' : next.kind === 'level' ? `Level ${s.level + 1}` : 'Extra';
+      const action = !next
+        ? '<span class="owned">✔ Max</span>'
+        : spend >= next.cost
+          ? `<button class="pill${armed === k ? ' armed' : ''}" data-up="${k}">${armed === k ? `Sure? ★ ${next.cost}` : `${label} ★ ${next.cost}`}</button>`
+          : `<button class="pill" disabled>${label} ★ ${next.cost}</button>`;
+      return `<div class="ability"><div class="info"><b>${spec.name} · level ${s.level}/${spec.levels.length}${s.extra ? ` + ${spec.extraName}` : ''}</b>
+        <span>${now}. Ready every ${spec.cooldown}s.${s.extra ? '' : ` Extra at level ${spec.levels.length} (${spec.extraName}): ${extraText}.`}</span></div>${action}</div>`;
+    }).join('');
+    showCard(
+      `<h2>Specials</h2>
+       <p>Tap a special's button during a battle, then tap the road. <span class="spend">★ ${spend} to spend</span></p>
+       <div class="abilities">${rows}</div>`,
+      [{ text: 'Back', main: true, onClick: showLevels }],
+    );
+    ui.card.querySelectorAll<HTMLButtonElement>('button[data-up]').forEach((b) => {
+      b.onclick = () => {
+        const k = b.dataset.up as SpecialKind;
+        if (armed === k) {
+          upgradeSpecial(k, BALANCE);
+          armed = null;
+        } else {
+          armed = k;
         }
         render();
       };
@@ -197,12 +247,13 @@ function showEnd(): void {
 function startLevel(index: number): void {
   levelIndex = index;
   level = LEVELS[index];
-  game = new Game(level, BALANCE, 1, loadAbilities(), loadHeroXp());
+  game = new Game(level, BALANCE, 1, { abilities: loadAbilities(), heroXp: loadHeroXp(), specials: loadSpecials() });
   savedXp = game.hero.xp;
   renderer = new Renderer(ctx, game);
   view = fitted;
   heroSelected = false;
   heroDrag = null;
+  armedSpecial = null;
   selected = null;
   shownEnd = false;
   closeMenu();
@@ -405,9 +456,31 @@ function selectHero(on: boolean): void {
   heroSelected = on;
 }
 
+const SPECIAL_HINT: Record<SpecialKind, string> = {
+  reinforce: 'Tap the road<small>where the soldiers should stand</small>',
+  volley: 'Tap where the arrows should fall',
+};
+
+function armSpecial(k: SpecialKind | null): void {
+  if (k) {
+    closeMenu();
+    selectHero(false);
+    showBanner(SPECIAL_HINT[k], Infinity);
+  } else if (armedSpecial) {
+    hideBanner();
+  }
+  armedSpecial = k;
+}
+
 function handleTap(sx: number, sy: number): void {
   if (!playing()) return;
   const w = toWorld(view, sx, sy);
+  if (armedSpecial) {
+    const ok = armedSpecial === 'reinforce' ? game.callReinforcements(w.x, w.y) : game.callVolley(w.x, w.y);
+    if (ok || armedSpecial === 'volley') armSpecial(null);
+    else showBanner('Tap on the road<small>for the reinforcements</small>', Infinity);
+    return;
+  }
   if (placingFlag !== null) return placeFlag(w.x, w.y);
   const heroDist = heroAt(w.x, w.y);
   if (heroSelected) {
@@ -544,8 +617,17 @@ ui.speed.onclick = () => {
   speed = speed === 1 ? 2 : 1;
   ui.speed.textContent = `${speed}×`;
 };
+for (const k of ['reinforce', 'volley'] as SpecialKind[]) {
+  ui.special[k].onclick = () => {
+    if (!playing() || game.specialIn[k] > 0) return;
+    armSpecial(armedSpecial === k ? null : k);
+  };
+}
 ui.heroPill.onclick = () => {
-  if (playing() && game.hero.state !== 'dead') selectHero(!heroSelected);
+  if (playing() && game.hero.state !== 'dead') {
+    armSpecial(null);
+    selectHero(!heroSelected);
+  }
 };
 ui.callWave.onclick = () => {
   if (!paused) game.callWave();
@@ -581,6 +663,17 @@ function updateHud(): void {
       `<span class="bar xp"><i style="width:${xp}%"></i></span></span>`);
   if (ui.heroPill.innerHTML !== pill) ui.heroPill.innerHTML = pill;
   ui.heroPill.classList.toggle('selected', heroSelected);
+  for (const k of ['reinforce', 'volley'] as SpecialKind[]) {
+    const el = ui.special[k];
+    const left = game.specialIn[k];
+    const share = left / BALANCE.specials[k].cooldown;
+    el.classList.toggle('waiting', left > 0);
+    el.classList.toggle('armed', armedSpecial === k);
+    el.style.background = left > 0 ? `conic-gradient(rgba(0, 0, 0, 0.6) ${share * 360}deg, rgba(42, 29, 18, 0.88) 0)` : '';
+    const cd = left > 0 ? String(Math.ceil(left)) : '';
+    const span = el.querySelector('.cd')!;
+    if (span.textContent !== cd) span.textContent = cd;
+  }
 }
 
 let last = performance.now();
@@ -604,7 +697,7 @@ function frame(now: number): void {
     savedXp = game.hero.xp;
     saveHeroXp(savedXp);
   }
-  renderer.draw(game, view, paused ? 0 : dt * speed, { selected, placingFlag: placingFlag !== null, preview, drag, heroSelected, heroDrag });
+  renderer.draw(game, view, paused ? 0 : dt * speed, { selected, placingFlag: placingFlag !== null, preview, drag, heroSelected, heroDrag, armedSpecial });
   game.events.length = 0;
   if (bannerTimer > 0 && (bannerTimer -= dt) <= 0) ui.banner.hidden = true;
   updateHud();

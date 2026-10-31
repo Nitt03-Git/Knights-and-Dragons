@@ -1,7 +1,7 @@
 // Draws the game with simple shapes. Phase 2 replaces these draw functions with real art;
 // nothing in here changes the game.
 import { makeRng } from './rng';
-import { FLY_HEIGHT, WORLD_H, WORLD_W, type Enemy, type Game, type Hero, type Knight, type Projectile, type Tower } from './sim';
+import { FLY_HEIGHT, WORLD_H, WORLD_W, type Enemy, type Game, type Hero, type Knight, type Projectile, type Strike, type Tower } from './sim';
 
 export interface View {
   /** CSS pixels per world unit, and where the world's top-left corner sits on screen. */
@@ -52,6 +52,7 @@ export interface Overlay {
   /** The hero is selected (waiting for where to ride), or being dragged to (x, y). */
   heroSelected: boolean;
   heroDrag: { x: number; y: number } | null;
+  armedSpecial: string | null;
 }
 
 export function toWorld(v: View, sx: number, sy: number) {
@@ -121,6 +122,7 @@ interface Scenery {
 export class Renderer {
   private floaters: Floater[] = [];
   private booms: Boom[] = [];
+  private spears: { x: number; y: number; tx: number; ty: number; age: number }[] = [];
   /** Which way the hero faces (1 right, -1 left), from how it last moved. */
   private heroFacing = 1;
   private heroLastX = 0;
@@ -229,6 +231,19 @@ export class Renderer {
         }
       }
     });
+    for (const k of game.soldiers) {
+      // Reinforcements: green tabards, fading out as they leave.
+      const alpha = Math.max(0.15, Math.min(1, k.leavesIn / 1.5));
+      items.push({
+        y: k.y,
+        draw: () => {
+          ctx.globalAlpha = alpha;
+          drawKnight(ctx, k, game.soldierStats().hp, game.time, game.inRally(k), '#3d7a3a');
+          ctx.globalAlpha = 1;
+        },
+      });
+    }
+    for (const st of game.strikes) drawStrike(ctx, st);
     if (hero.state !== 'dead') items.push({ y: hero.y, draw: () => drawHero(ctx, hero, game.heroStats().hp, game.time, facing) });
     items.sort((a, b) => a.y - b.y);
     for (const it of items) it.draw();
@@ -236,6 +251,19 @@ export class Renderer {
     for (const e of game.enemies) if (e.spec.flying) drawEnemy(ctx, e, game.paths[e.path].length);
     for (const p of game.projectiles) drawProjectile(ctx, p);
     this.drawBooms(game, dt);
+    for (const ev of game.events) if (ev.kind === 'spear') this.spears.push({ ...ev, age: 0 });
+    for (const sp of this.spears) {
+      sp.age += dt;
+      ctx.globalAlpha = Math.max(0, 1 - sp.age / 0.25);
+      ctx.strokeStyle = '#eef2f6';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(sp.x, sp.y - 20);
+      ctx.lineTo(sp.tx, sp.ty);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    this.spears = this.spears.filter((sp) => sp.age < 0.25);
 
     this.drawFloaters(game, dt);
   }
@@ -667,6 +695,34 @@ function drawFlag(ctx: CanvasRenderingContext2D, x: number, y: number, big: bool
   ctx.globalAlpha = 1;
 }
 
+/** An Arrow Volley about to land: the circle it will hit, and arrows coming down into it. */
+function drawStrike(ctx: CanvasRenderingContext2D, st: Strike): void {
+  const f = 1 - st.left / st.delay;
+  ctx.fillStyle = `rgba(224, 83, 61, ${0.1 + f * 0.2})`;
+  ctx.strokeStyle = 'rgba(224, 83, 61, 0.85)';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([8, 8]);
+  ctx.beginPath();
+  ctx.ellipse(st.x, st.y, st.radius, st.radius * 0.55, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = '#3b2a1a';
+  ctx.lineWidth = 2.5;
+  const n = Math.round(st.radius / 6);
+  for (let i = 0; i < n; i++) {
+    // Fixed scatter per arrow, so they fall in place rather than jitter.
+    const a = (i * 2.399) % (Math.PI * 2);
+    const r = st.radius * Math.sqrt(((i * 0.618) % 1) * 0.9);
+    const x = st.x + Math.cos(a) * r;
+    const y = st.y + Math.sin(a) * r * 0.55 - (1 - f) * 260 - (i % 3) * 20;
+    ctx.beginPath();
+    ctx.moveTo(x - 4, y - 18);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  }
+}
+
 function drawMarker(ctx: CanvasRenderingContext2D, x: number, y: number): void {
   ctx.strokeStyle = 'rgba(255, 213, 74, 0.9)';
   ctx.lineWidth = 3;
@@ -796,7 +852,7 @@ function drawHero(ctx: CanvasRenderingContext2D, h: Hero, maxHp: number, time: n
   }
 }
 
-function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: number, time: number, rallied: boolean): void {
+function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: number, time: number, rallied: boolean, tabard = C.tabard): void {
   if (rallied) {
     // Inside the hero's Rallying Banner: a gold glow under the feet.
     const glow = ctx.createRadialGradient(k.x, k.y, 0, k.x, k.y, 20);
@@ -821,7 +877,7 @@ function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: number, tim
   ctx.beginPath();
   ctx.arc(k.x, cy, r, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = C.tabard;
+  ctx.fillStyle = tabard;
   ctx.fillRect(k.x - 5, cy - 2, 10, 10);
   // Helmet visor
   ctx.strokeStyle = C.steelDark;
@@ -843,7 +899,7 @@ function drawKnight(ctx: CanvasRenderingContext2D, k: Knight, maxHp: number, tim
   ctx.stroke();
   ctx.restore();
   // Shield
-  ctx.fillStyle = C.tabard;
+  ctx.fillStyle = tabard;
   ctx.strokeStyle = C.gold;
   ctx.lineWidth = 1.5;
   ctx.beginPath();

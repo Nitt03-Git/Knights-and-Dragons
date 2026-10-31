@@ -1,7 +1,7 @@
 // Best stars per level, kept in this browser on the phone. Storage can be missing or blocked
 // (private tabs, cleared site data), so every read and write is allowed to fail quietly:
 // the game then simply starts with only level 1 unlocked.
-import type { HeroAbility, HeroSpec, Level } from './types';
+import type { Balance, HeroAbility, HeroSpec, Level, SpecialKind, SpecialProgress } from './types';
 
 const KEY = 'knights-and-dragons.progress.v1';
 
@@ -53,15 +53,17 @@ export function earnedStars(p: Progress): number {
   return Object.values(p).reduce((sum, s) => sum + (Number(s) || 0), 0);
 }
 
-/** Stars left to spend after the abilities already bought. */
-export function starsToSpend(p: Progress, owned: HeroAbility[], hero: HeroSpec): number {
-  return earnedStars(p) - owned.reduce((sum, a) => sum + hero[a].cost, 0);
+/** Stars left to spend after hero abilities and special upgrades already bought. */
+export function starsToSpend(p: Progress, owned: HeroAbility[], hero: HeroSpec, specials?: Specials, balance?: Balance): number {
+  const heroCost = owned.reduce((sum, a) => sum + hero[a].cost, 0);
+  return earnedStars(p) - heroCost - (specials && balance ? specialsSpent(specials, balance) : 0);
 }
 
 /** Buys an ability if there are enough stars; returns what is owned afterwards. */
-export function buyAbility(a: HeroAbility, hero: HeroSpec): HeroAbility[] {
+export function buyAbility(a: HeroAbility, balance: Balance): HeroAbility[] {
+  const hero = balance.hero;
   const owned = loadAbilities();
-  if (owned.includes(a) || starsToSpend(loadProgress(), owned, hero) < hero[a].cost) return owned;
+  if (owned.includes(a) || starsToSpend(loadProgress(), owned, hero, loadSpecials(), balance) < hero[a].cost) return owned;
   const next = [...owned, a];
   try {
     localStorage.setItem(HERO_KEY, JSON.stringify(next));
@@ -89,4 +91,57 @@ export function saveHeroXp(xp: number): void {
   } catch {
     // Not saved; the XP still counts for this battle.
   }
+}
+
+const SPECIALS_KEY = 'knights-and-dragons.specials.v1';
+
+export type Specials = Record<SpecialKind, SpecialProgress>;
+
+const FRESH: Specials = { reinforce: { level: 1, extra: false }, volley: { level: 1, extra: false } };
+
+/** How far each special is upgraded (both start at level 1, usable from the first battle). */
+export function loadSpecials(): Specials {
+  try {
+    const s = JSON.parse(localStorage.getItem(SPECIALS_KEY) ?? 'null');
+    const read = (k: SpecialKind): SpecialProgress => ({
+      level: Math.max(1, Math.min(5, Number(s?.[k]?.level) || 1)),
+      extra: s?.[k]?.extra === true,
+    });
+    return { reinforce: read('reinforce'), volley: read('volley') };
+  } catch {
+    return structuredClone(FRESH);
+  }
+}
+
+/** Stars spent on special upgrades. */
+export function specialsSpent(specials: Specials, balance: Balance): number {
+  return (['reinforce', 'volley'] as const).reduce((sum, k) => {
+    const spec = balance.specials[k];
+    return sum + (specials[k].level - 1) * spec.upgradeCost + (specials[k].extra ? spec.extraCost : 0);
+  }, 0);
+}
+
+/** What the next upgrade of a special is and costs: a level, the extra, or nothing (null). */
+export function nextSpecialUpgrade(k: SpecialKind, specials: Specials, balance: Balance): { kind: 'level' | 'extra'; cost: number } | null {
+  const spec = balance.specials[k];
+  const s = specials[k];
+  if (s.level < spec.levels.length) return { kind: 'level', cost: spec.upgradeCost };
+  if (!s.extra) return { kind: 'extra', cost: spec.extraCost };
+  return null;
+}
+
+/** Buys the next upgrade of a special if there are enough stars; returns the specials afterwards. */
+export function upgradeSpecial(k: SpecialKind, balance: Balance): Specials {
+  const specials = loadSpecials();
+  const next = nextSpecialUpgrade(k, specials, balance);
+  if (!next || starsToSpend(loadProgress(), loadAbilities(), balance.hero, specials, balance) < next.cost) return specials;
+  const after = structuredClone(specials);
+  if (next.kind === 'level') after[k].level++;
+  else after[k].extra = true;
+  try {
+    localStorage.setItem(SPECIALS_KEY, JSON.stringify(after));
+  } catch {
+    return specials;
+  }
+  return after;
 }
