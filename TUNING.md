@@ -83,12 +83,14 @@ Both specials start at level 1 and are upgraded with stars on the Specials scree
 
 **Reinforcements** (`reinforce`): `count` soldiers (2) stay `duration` seconds (15) on the
 road, walk at `speed`, strike every `attackCooldown` seconds and hold `holds` enemies each.
-`levels` gives each level's `hp`, `damage` and `armor`. With the extra they also hit flyers
-within `skyReach` (80).
+`levels` gives each level's `hp`, `damage` and `armor`. With the extra (Sky spears) each
+soldier also throws a spear at the nearest flyer within `skyReach` (150), one every
+`skyCooldown` seconds (1.5), for `skyDamage` (2) times its sword damage, even while fighting.
 
 **Arrow Volley** (`volley`): lands `delay` seconds (0.8) after the tap. `levels` gives each
-level's `damage` and `radius` (how big the circle is). The extra adds `extraSpots` (3) small
-volleys of size `extraRadius` (45) on random spots of the road.
+level's `damage` and `radius` (how big the circle is: 70, 80, 90, 105, 125). The extra adds
+`extraSpots` (3) smaller volleys of size `extraRadius` (55) on random spots of the road within
+`extraSpread` (260) of where you aimed, spread apart from each other.
 
 ## Enemies (`balance.json` → `enemies`)
 

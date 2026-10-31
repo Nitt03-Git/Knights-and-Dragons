@@ -85,6 +85,8 @@ export interface Hero {
 export interface Soldier extends Knight {
   post: { x: number; y: number };
   leavesIn: number;
+  /** Sky spears: seconds until the next throw at a flyer. */
+  spearIn: number;
 }
 
 /** An Arrow Volley on its way down. */
@@ -129,8 +131,8 @@ export interface Tower {
 }
 
 export interface Projectile {
-  /** Arrows and bolts follow their target; shells fly to a spot on the ground and splash. */
-  kind: 'arrow' | 'bolt' | 'shell';
+  /** Arrows, bolts and spears follow their target; shells fly to a spot on the ground and splash. */
+  kind: 'arrow' | 'bolt' | 'shell' | 'spear';
   x: number;
   y: number;
   sx: number;
@@ -394,7 +396,7 @@ export class Game {
       const post = pointAt(this.paths[spot.path], spot.d, (slot - (spec.count - 1) / 2) * 26);
       this.soldiers.push({
         id: this.nextId++, pad: -1, slot, x: post.x, y: post.y, hp: stats.hp, state: 'idle', target: null, holding: [],
-        cooldown: 0, respawnIn: 0, hitAge: 9, post, leavesIn: spec.duration,
+        cooldown: 0, respawnIn: 0, hitAge: 9, post, leavesIn: spec.duration, spearIn: 0,
       });
     }
     this.specialIn.reinforce = spec.cooldown;
@@ -408,12 +410,25 @@ export class Game {
     const stats = this.volleyStats();
     this.strikes.push({ x, y, radius: stats.radius, damage: stats.damage, left: spec.delay, delay: spec.delay });
     if (this.specials.volley.extra) {
+      // Random road spots near where the player aimed, kept apart from each other and from the
+      // main circle so they spread out.
+      const road = this.paths.flatMap((p) => p.samples).filter((s) => s.x > 40 && s.x < WORLD_W - 40 && s.y > 40 && s.y < WORLD_H - 40);
+      const taken: { x: number; y: number; r: number }[] = [{ x, y, r: stats.radius }];
+      const free = (s: { x: number; y: number }) => taken.every((t) => Math.hypot(s.x - t.x, s.y - t.y) >= t.r + spec.extraRadius);
       for (let i = 0; i < spec.extraSpots; i++) {
-        // A random spot on a road, inside the map.
-        const path = this.paths[Math.floor(this.rng() * this.paths.length)];
-        const inside = path.samples.filter((s) => s.x > 40 && s.x < WORLD_W - 40 && s.y > 40 && s.y < WORLD_H - 40);
-        const s = inside[Math.floor(this.rng() * inside.length)];
-        if (s) this.strikes.push({ x: s.x, y: s.y, radius: spec.extraRadius, damage: stats.damage, left: spec.delay, delay: spec.delay });
+        let pick: (typeof road)[number] | undefined;
+        // Look near the aim first; if there is no room (e.g. at the map's edge), look further out.
+        for (const spread of [1, 1.6, 2.5, Infinity]) {
+          const pool = road.filter((s) => Math.hypot(s.x - x, s.y - y) <= spec.extraSpread * spread && free(s));
+          if (pool.length) {
+            pick = pool[Math.floor(this.rng() * pool.length)];
+            break;
+          }
+        }
+        pick ??= road[Math.floor(this.rng() * road.length)];
+        if (!pick) continue;
+        taken.push({ x: pick.x, y: pick.y, r: spec.extraRadius });
+        this.strikes.push({ x: pick.x, y: pick.y, radius: spec.extraRadius, damage: stats.damage, left: spec.delay, delay: spec.delay });
       }
     }
     this.specialIn.volley = spec.cooldown;
@@ -659,14 +674,26 @@ export class Game {
         return !!e?.alive && e.heldBy === k.id;
       });
       this.fight(k, unit, stats.damage, spec.attackCooldown, 'physical', k.post, ENGAGE_RANGE, dt);
-      // Sky spears: when not busy on the road, hit flyers passing close by.
-      if (this.specials.reinforce.extra && k.state !== 'fighting') {
-        k.cooldown -= dt;
-        const flyer = this.enemies.find((e) => e.alive && e.spec.flying && Math.hypot(e.x - k.x, e.y - k.y) <= spec.skyReach);
-        if (flyer && k.cooldown <= 0) {
-          this.hit(flyer, this.roll(stats.damage), 'physical');
-          k.cooldown = spec.attackCooldown;
-          k.hitAge = 9;
+      // Sky spears: also throw spears at flyers within reach, even while fighting on the road.
+      if (this.specials.reinforce.extra) {
+        k.spearIn = Math.max(0, k.spearIn - dt);
+        let flyer: Enemy | undefined;
+        let best = spec.skyReach;
+        for (const e of this.enemies) {
+          const dist = Math.hypot(e.x - k.x, e.y - k.y);
+          if (e.alive && e.spec.flying && dist <= best) {
+            flyer = e;
+            best = dist;
+          }
+        }
+        if (flyer && k.spearIn === 0) {
+          const [lo, hi] = stats.damage;
+          this.projectiles.push({
+            kind: 'spear', x: k.x, y: k.y - 24, sx: k.x, sy: k.y - 24, target: flyer.id, tx: flyer.x, ty: flyer.y,
+            speed: 700, damage: this.roll([lo * spec.skyDamage, hi * spec.skyDamage]), damageType: 'physical',
+            pierce: 0, splash: 0, t: 0, flight: 0, done: false,
+          });
+          k.spearIn = spec.skyCooldown;
           this.events.push({ kind: 'spear', x: k.x, y: k.y, tx: flyer.x, ty: flyer.y - FLY_HEIGHT - flyer.spec.size });
         }
       }

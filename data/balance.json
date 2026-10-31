@@ -20,7 +20,7 @@
   "specials": {
     "reinforce": {
       "name": "Reinforcements", "cooldown": 25, "duration": 15, "count": 2, "speed": 90, "attackCooldown": 1.0, "holds": 1,
-      "upgradeCost": 3, "extraCost": 5, "extraName": "Sky spears", "skyReach": 80,
+      "upgradeCost": 3, "extraCost": 5, "extraName": "Sky spears", "skyReach": 150, "skyCooldown": 1.5, "skyDamage": 2,
       "levels": [
         {"hp": 50, "damage": [3, 5], "armor": 0.1},
         {"hp": 60, "damage": [4, 6], "armor": 0.15},
@@ -31,13 +31,13 @@
     },
     "volley": {
       "name": "Arrow Volley", "cooldown": 45, "delay": 0.8,
-      "upgradeCost": 3, "extraCost": 5, "extraName": "Scattered volleys", "extraSpots": 3, "extraRadius": 45,
+      "upgradeCost": 3, "extraCost": 5, "extraName": "Scattered volleys", "extraSpots": 3, "extraRadius": 55, "extraSpread": 260,
       "levels": [
         {"damage": 40, "radius": 70},
-        {"damage": 50, "radius": 75},
-        {"damage": 60, "radius": 80},
-        {"damage": 72, "radius": 85},
-        {"damage": 85, "radius": 90}
+        {"damage": 50, "radius": 80},
+        {"damage": 60, "radius": 90},
+        {"damage": 72, "radius": 105},
+        {"damage": 85, "radius": 125}
       ]
     }
   },

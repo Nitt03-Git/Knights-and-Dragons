@@ -121,8 +121,11 @@ export interface ReinforceSpec {
   upgradeCost: number;
   extraCost: number;
   extraName: string;
-  /** With the extra: soldiers also hit flyers within this distance. */
+  /** With the extra: soldiers also throw spears at flyers within `skyReach`, one every
+   * `skyCooldown` seconds, for `skyDamage` times their sword damage. */
   skyReach: number;
+  skyCooldown: number;
+  skyDamage: number;
   levels: { hp: number; damage: [number, number]; armor: number }[];
 }
 
@@ -134,9 +137,11 @@ export interface VolleySpec {
   upgradeCost: number;
   extraCost: number;
   extraName: string;
-  /** With the extra: this many more small volleys land on random spots of the road. */
+  /** With the extra: this many more small volleys land on random road spots within
+   * `extraSpread` of where the player aimed. */
   extraSpots: number;
   extraRadius: number;
+  extraSpread: number;
   levels: { damage: number; radius: number }[];
 }
 

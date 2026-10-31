@@ -478,7 +478,14 @@ describe('specials', () => {
     g.callVolley(800, 450);
     expect(g.strikes.length).toBe(1 + V.extraSpots);
     expect(g.strikes[0]).toMatchObject({ damage: V.levels[4].damage, radius: V.levels[4].radius });
-    for (const st of g.strikes.slice(1)) expect(distanceToPath(g.paths[0], st.x, st.y)).toBeLessThan(1);
+    for (const st of g.strikes.slice(1)) {
+      expect(distanceToPath(g.paths[0], st.x, st.y)).toBeLessThan(1);
+      expect(Math.hypot(st.x - 800, st.y - 450)).toBeLessThanOrEqual(V.extraSpread * 2.5);
+    }
+    // ...spread out, not on top of each other
+    for (const a of g.strikes.slice(1)) for (const b of g.strikes.slice(1)) {
+      if (a !== b) expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(2 * V.extraRadius - 1);
+    }
   });
 
   it('only soldiers with the extra hit flyers', () => {
@@ -497,7 +504,19 @@ describe('specials', () => {
       return n;
     };
     expect(hits(false)).toBe(0);
-    expect(hits(true)).toBeGreaterThan(0);
+    expect(hits(true)).toBeGreaterThan(3);
+    // ...and the spears do damage: with only soldiers around, flyers get hurt.
+    const g = new Game(wave('wyrmling', 3, 1.5), BALANCE, 1, { specials: { reinforce: { level: 5, extra: true } } });
+    g.moveHero(100, 850);
+    const spot = pointAt(g.paths[0], 450);
+    g.callReinforcements(spot.x, spot.y);
+    g.callWave();
+    let hurt = false;
+    for (let i = 0; i < 60 * R.duration; i++) {
+      g.step();
+      hurt ||= g.enemies.some((e) => e.hp < e.spec.hp);
+    }
+    expect(hurt).toBe(true);
   });
 
   it('upgrades cost stars', () => {

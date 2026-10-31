@@ -138,6 +138,10 @@ Each one is a version the owner can play from the link.
   Note: fully upgrading both costs 34 ★ (+4 for the hero); 3 levels give at most 9.
 - **0.7.1 ✅**: testing switch: open once with `?teststars` for 50 extra stars (remembered on
   the phone, `?teststars=0` turns it off). Upgrade prices stay as they are for now.
+- **0.7.2 ✅** (owner tested maxed specials): Sky spears now really work: soldiers throw a
+  visible spear at the nearest flyer within 150 every 1.5 s for double damage, even while
+  fighting. Scattered volleys land near where you aim (within 260, spread apart) instead of
+  anywhere on the road. The volley circle grows clearly: 70, 80, 90, 105, 125.
 - **0.8**: Level Studio: draw a road with a finger, place build spots, set waves, then
   "Copy level" and paste it into the chat so Claude adds it to `data/levels.json`.
 - **Later**: branching upgrades, sound, more levels, then Phase 2 and Phase 3.

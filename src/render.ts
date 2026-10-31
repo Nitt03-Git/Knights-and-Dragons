@@ -122,7 +122,6 @@ interface Scenery {
 export class Renderer {
   private floaters: Floater[] = [];
   private booms: Boom[] = [];
-  private spears: { x: number; y: number; tx: number; ty: number; age: number }[] = [];
   /** Which way the hero faces (1 right, -1 left), from how it last moved. */
   private heroFacing = 1;
   private heroLastX = 0;
@@ -251,19 +250,7 @@ export class Renderer {
     for (const e of game.enemies) if (e.spec.flying) drawEnemy(ctx, e, game.paths[e.path].length);
     for (const p of game.projectiles) drawProjectile(ctx, p);
     this.drawBooms(game, dt);
-    for (const ev of game.events) if (ev.kind === 'spear') this.spears.push({ ...ev, age: 0 });
-    for (const sp of this.spears) {
-      sp.age += dt;
-      ctx.globalAlpha = Math.max(0, 1 - sp.age / 0.25);
-      ctx.strokeStyle = '#eef2f6';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(sp.x, sp.y - 20);
-      ctx.lineTo(sp.tx, sp.ty);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-    this.spears = this.spears.filter((sp) => sp.age < 0.25);
+
 
     this.drawFloaters(game, dt);
   }
@@ -479,6 +466,23 @@ function drawProjectile(ctx: CanvasRenderingContext2D, p: Projectile): void {
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(ang);
+  if (p.kind === 'spear') {
+    // A long wooden shaft with a steel tip.
+    ctx.strokeStyle = '#7a5230';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(-30, 0);
+    ctx.lineTo(4, 0);
+    ctx.stroke();
+    ctx.fillStyle = '#e6ebf0';
+    ctx.beginPath();
+    ctx.moveTo(14, 0);
+    ctx.lineTo(3, -5);
+    ctx.lineTo(3, 5);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
   ctx.strokeStyle = '#3b2a1a';
   ctx.lineWidth = 3;
   ctx.beginPath();
