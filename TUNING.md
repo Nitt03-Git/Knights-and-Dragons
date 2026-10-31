@@ -116,6 +116,16 @@ Each wave is a list of groups that start together:
 `count` enemies of that type, one every `interval` seconds, starting `delay` seconds into the
 wave (0 when left out), on road number `path` (0 is the first road; Twin Fords has 0 and 1).
 
+## Test stars
+
+To try upgrades without earning the stars, open the game once in Chrome with `?teststars` at
+the end of the address:
+https://nitt03-git.github.io/Knights-and-Dragons/?teststars
+You get 50 extra stars to spend. The phone remembers it (also in the home-screen app) until
+you open https://nitt03-git.github.io/Knights-and-Dragons/?teststars=0 . The level screen
+shows a note while it's on. Turning it off takes the 50 away again; upgrades already bought
+stay, so stars to spend can then be below zero until you earn more.
+
 ## Changing a number yourself on GitHub
 
 1. In Chrome, open https://github.com/Nitt03-Git/Knights-and-Dragons/blob/main/data/balance.json

@@ -136,6 +136,8 @@ Each one is a version the owner can play from the link.
   circle (flyers too), ready every 45 s; levels add damage and size; extra **Scattered
   volleys**: 3 more small volleys on random spots of the road.
   Note: fully upgrading both costs 34 ★ (+4 for the hero); 3 levels give at most 9.
+- **0.7.1 ✅**: testing switch: open once with `?teststars` for 50 extra stars (remembered on
+  the phone, `?teststars=0` turns it off). Upgrade prices stay as they are for now.
 - **0.8**: Level Studio: draw a road with a finger, place build spots, set waves, then
   "Copy level" and paste it into the chat so Claude adds it to `data/levels.json`.
 - **Later**: branching upgrades, sound, more levels, then Phase 2 and Phase 3.
@@ -155,6 +157,6 @@ wording borrowed from other games.
 
 ## Open questions for the owner
 
-- Stars: upgrades cost far more than 3 levels can give; more levels, cheaper upgrades, or both?
+- Stars: upgrades cost far more than 3 levels can give (prices kept for now; test stars meanwhile).
 - Ability prices after testing (planned 5 ★ and 10 ★; 3 levels give at most 9 ★).
 - How many levels for a first "complete" version?

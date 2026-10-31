@@ -6,11 +6,11 @@ import '@fontsource/fredoka/latin-700.css';
 import './style.css';
 import { BALANCE, LEVELS } from './data';
 import { fitView, panView, Renderer, toScreen, toWorld, zoomView, type Overlay, type View } from './render';
-import { buyAbility, isUnlocked, loadAbilities, loadHeroXp, loadProgress, loadSpecials, nextSpecialUpgrade, saveHeroXp, saveStars, starsToSpend, upgradeSpecial } from './progress';
+import { buyAbility, isUnlocked, setTestStars, TEST_STARS, testStarsOn, loadAbilities, loadHeroXp, loadProgress, loadSpecials, nextSpecialUpgrade, saveHeroXp, saveStars, starsToSpend, upgradeSpecial } from './progress';
 import { Game, STEP } from './sim';
 import type { HeroAbility, SpecialKind } from './types';
 
-const VERSION = '0.7';
+const VERSION = '0.7.1';
 
 /** Towers in the build ring, clockwise from top-left. */
 const BUILD_RING: { type: string; icon: string; label: string; angle: number; soon?: string }[] = [
@@ -63,6 +63,13 @@ let bannerTimer = 0;
 
 ui.version.textContent = `v${VERSION} · build ${__BUILD__}`;
 
+// Testing switch: `?teststars` gives extra stars to try upgrades with, `?teststars=0` takes them away.
+// It is remembered on the phone, so it also works when the game is opened from the home screen.
+{
+  const flag = new URLSearchParams(location.search).get('teststars');
+  if (flag !== null) setTestStars(flag !== '0');
+}
+
 function resize(): void {
   const dpr = Math.min(window.devicePixelRatio || 1, 3);
   const w = window.innerWidth;
@@ -110,7 +117,8 @@ function showLevels(): void {
   showCard(
     `<h1>Knights &amp; Dragons</h1>
      <p>Tap a stone spot to build. Bowmen shoot, knights hold the road, wizards ignore armor, catapults hit groups. Pinch to zoom.</p>
-     <div class="levels">${cards}</div>`,
+     <div class="levels">${cards}</div>
+     ${testStarsOn() ? `<p class="spend">Testing: +${TEST_STARS} stars (?teststars=0 turns it off)</p>` : ''}`,
     [
       { text: `🐴 Hero${spend > 0 ? ` · ★ ${spend}` : ''}`, onClick: showHero },
       { text: '✨ Specials', onClick: showSpecials },

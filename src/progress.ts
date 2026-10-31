@@ -53,10 +53,33 @@ export function earnedStars(p: Progress): number {
   return Object.values(p).reduce((sum, s) => sum + (Number(s) || 0), 0);
 }
 
-/** Stars left to spend after hero abilities and special upgrades already bought. */
+const TEST_KEY = 'knights-and-dragons.teststars.v1';
+/** Extra stars while the testing switch is on (open the game once with `?teststars`). */
+export const TEST_STARS = 50;
+
+/** Turns the testing switch on or off; it stays that way on this phone until changed. */
+export function setTestStars(on: boolean): void {
+  try {
+    if (on) localStorage.setItem(TEST_KEY, '1');
+    else localStorage.removeItem(TEST_KEY);
+  } catch {
+    // Storage blocked: the switch simply stays off.
+  }
+}
+
+export function testStarsOn(): boolean {
+  try {
+    return localStorage.getItem(TEST_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Stars left to spend after hero abilities and special upgrades already bought (plus test stars). */
 export function starsToSpend(p: Progress, owned: HeroAbility[], hero: HeroSpec, specials?: Specials, balance?: Balance): number {
   const heroCost = owned.reduce((sum, a) => sum + hero[a].cost, 0);
-  return earnedStars(p) - heroCost - (specials && balance ? specialsSpent(specials, balance) : 0);
+  const bonus = testStarsOn() ? TEST_STARS : 0;
+  return earnedStars(p) + bonus - heroCost - (specials && balance ? specialsSpent(specials, balance) : 0);
 }
 
 /** Buys an ability if there are enough stars; returns what is owned afterwards. */
