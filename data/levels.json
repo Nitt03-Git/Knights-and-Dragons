@@ -57,7 +57,7 @@
     {
       "id": "x-road",
       "name": "X-Road",
-      "startGold": 380,
+      "startGold": 290,
       "paths": [
         { "points": [[-140, 359], [0, 359], [101, 360], [152, 356], [209, 356], [265, 352], [315, 355], [377, 353], [441, 351], [507, 352], [566, 354], [619, 357], [670, 368], [722, 384], [782, 411], [824, 440], [876, 478], [918, 519], [962, 559], [1001, 600], [1037, 637], [1073, 676], [1113, 711], [1160, 752], [1205, 784], [1259, 808], [1329, 819], [1403, 822], [1474, 824], [1539, 824], [1600, 821], [1740, 821]] },
         { "points": [[-140, 772], [0, 772], [73, 778], [129, 784], [183, 785], [244, 783], [304, 781], [373, 776], [443, 766], [495, 756], [546, 747], [618, 733], [686, 712], [747, 690], [802, 669], [862, 644], [914, 618], [965, 591], [1027, 552], [1079, 516], [1128, 476], [1181, 444], [1236, 408], [1296, 374], [1353, 342], [1408, 319], [1473, 301], [1537, 294], [1600, 285], [1740, 285]] }
@@ -67,8 +67,8 @@
         { "groups": [{ "enemy": "kobold", "count": 8, "interval": 1 }, { "enemy": "kobold", "count": 8, "interval": 1, "path": 1 }] },
         { "groups": [{ "enemy": "brute", "count": 4, "interval": 1 }, { "enemy": "brute", "count": 4, "interval": 3, "delay": 6, "path": 1 }] },
         { "groups": [{ "enemy": "brute", "count": 5, "interval": 2, "delay": 8 }, { "enemy": "brute", "count": 5, "interval": 2, "delay": 8, "path": 1 }, { "enemy": "kobold", "count": 8, "interval": 1 }, { "enemy": "kobold", "count": 8, "interval": 1, "path": 1 }] },
-        { "groups": [{ "enemy": "wyrmling", "count": 8, "interval": 4 }, { "enemy": "wyrmling", "count": 8, "interval": 6, "path": 1 }, { "enemy": "kobold", "count": 10, "interval": 1, "delay": 6 }, { "enemy": "kobold", "count": 10, "interval": 1, "delay": 10 }] },
-        { "groups": [{ "enemy": "troll", "count": 2, "interval": 12 }, { "enemy": "troll", "count": 2, "interval": 12, "delay": 6, "path": 1 }, { "enemy": "hexling", "count": 6, "interval": 1, "delay": 10 }, { "enemy": "hexling", "count": 6, "interval": 1, "path": 1, "delay": 10 }] }
+        { "groups": [{ "enemy": "wyrmling", "count": 8, "interval": 4 }, { "enemy": "wyrmling", "count": 8, "interval": 6, "path": 1 }, { "enemy": "kobold", "count": 10, "interval": 1, "delay": 6 }, { "enemy": "kobold", "count": 10, "interval": 1, "delay": 10, "path": 1 }] },
+        { "groups": [{ "enemy": "troll", "count": 2, "interval": 1 }, { "enemy": "troll", "count": 2, "interval": 1, "path": 1 }, { "enemy": "hexling", "count": 6, "interval": 1, "delay": 10 }, { "enemy": "hexling", "count": 6, "interval": 1, "path": 1, "delay": 10 }] }
       ]
     }
   ]

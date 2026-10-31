@@ -151,6 +151,10 @@ Each one is a version the owner can play from the link.
   Changed with the bot: start gold 290 → 380 and the four trolls of wave 5 spaced out (they
   came all at once); the bot then wins with all 8 spots, on 1 star. Studio fix: a finger that
   starts or ends beside the map is cut at the edge, so roads no longer double back at the ends.
+- **0.8.2 ✅**: owner played X-Road: too easy with the 0.8.1 changes, so start gold is back to
+  290 and the trolls come together again; wave 4's second kobold group now uses the second
+  road. Meant to be beaten with the hero and specials: the bot (which uses neither) loses it,
+  so `test/balance.test.ts` skips "a full defence wins" for X-Road on purpose.
 - **0.9**: **Look Lab**: every unit animating side by side with sliders (size, bounce, swing
   speed, colours); "Copy" the settings to paste in the chat. Owner is also looking at
   Kenney.nl art packs for Phase 2.

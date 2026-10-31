@@ -5,6 +5,10 @@ import { autoPlan, LEVELS, playBot } from './bot';
 // a full defence wins every level, two towers lose. The printed table is the quickest way to
 // see what a balance change did. Run with `npm run balance`; it is left out of `npm run check`
 // so the owner's own tweaks to data/balance.json are never blocked from publishing.
+// Levels the owner wants harder than the bot can manage: they're meant for a player who uses
+// the hero and specials (the bot uses neither). Still printed, but "a full defence wins" isn't
+// checked for these. X-Road: owner's choice after playing it (0.8.2).
+const NEEDS_SPECIALS = new Set(['x-road']);
 const env = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {};
 
 for (const level of LEVELS) {
@@ -21,7 +25,7 @@ for (const level of LEVELS) {
     }
     console.log(rows.join('\n'));
     for (const r of results) {
-      if (r.towers === plan.length) expect(r.phase).toBe('won');
+      if (r.towers === plan.length && !NEEDS_SPECIALS.has(level.id)) expect(r.phase).toBe('won');
       if (r.towers === 2) expect(r.phase).toBe('lost');
     }
   });
