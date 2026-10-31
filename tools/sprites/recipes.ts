@@ -86,7 +86,7 @@ const UNITS = [
 ];
 
 /** Characters face left (the game mirrors them to face right); the armour is tinted in the game. */
-export const CHARACTERS = UNITS.flatMap((u) =>
+const KNIGHTS = UNITS.flatMap((u) =>
   ANIMS.map(([anim, clip, length, n]) => ({
     name: `${u.name}-${anim}`,
     model: KNIGHT,
@@ -99,3 +99,60 @@ export const CHARACTERS = UNITS.flatMap((u) =>
     mask: 'Armor',
   })),
 );
+
+// ---- Enemies: Quaternius' monsters (art/monster-pack, CC0), named after the enemy they play ----
+
+interface EnemyArt {
+  type: string;
+  model: string;
+  height: number;
+  /** Game animation → [file's animation, length in seconds, pictures, start time]. */
+  anims: Record<string, [string, number, number, number?]>;
+  colors?: Record<string, string>;
+  opacity?: Record<string, number>;
+  mask: string;
+}
+
+const ENEMIES: EnemyArt[] = [
+  {
+    type: 'kobold', model: 'Alien', height: 0.62, mask: 'Main',
+    anims: { walk: ['Alien_Run', 0.88, 8], fight: ['Alien_Punch', 0.92, 6], death: ['Alien_Death', 2.29, 8] },
+    colors: { Main: '#e6e6e6' },
+  },
+  {
+    type: 'hexling', model: 'Alien_Helmet', height: 0.7, mask: 'Main',
+    anims: { walk: ['Alien_Walk', 1.04, 8], fight: ['Alien_Punch', 0.92, 6], death: ['Alien_Death', 2.29, 8] },
+    colors: { Main: '#e6e6e6', Glass: '#cfe8ff' },
+    opacity: { Glass: 0.35 },
+  },
+  {
+    type: 'brute', model: 'Robot', height: 0.95, mask: 'Main',
+    anims: { walk: ['Robot_Walking', 0.96, 8], fight: ['Robot_Punch', 0.83, 6], death: ['Robot_Death', 0.96, 6] },
+    colors: { Main: '#e6e6e6' },
+  },
+  {
+    // No death in the file: the game lets the troll sink and fade.
+    type: 'troll', model: 'Zombie', height: 1.4, mask: 'Texture',
+    anims: { walk: ['ZombieWalk', 4.0, 12], fight: ['ZombieBite', 1.6, 8, 1.2] },
+    colors: { Texture: '#e6e6e6' },
+  },
+];
+
+const ENEMY_SHEETS = ENEMIES.flatMap((e) =>
+  Object.entries(e.anims).map(([anim, [clip, length, n, start]]) => ({
+    name: `${e.type}-${anim}`,
+    model: `/art/monster-pack/${e.model}.fbx`,
+    height: e.height,
+    anim: clip,
+    times: moments(length, n).map((t) => Math.round((t + (start ?? 0)) * 1000) / 1000),
+    facing: 180,
+    colors: e.colors,
+    opacity: e.opacity,
+    mask: e.mask,
+  })),
+);
+
+/** How long each enemy animation lasts, for the game (seconds). */
+export const ENEMY_ANIMS = Object.fromEntries(ENEMIES.map((e) => [e.type, Object.fromEntries(Object.entries(e.anims).map(([a, [, len]]) => [a, len]))]));
+
+export const CHARACTERS = [...KNIGHTS, ...ENEMY_SHEETS];

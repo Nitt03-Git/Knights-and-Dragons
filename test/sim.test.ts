@@ -635,11 +635,11 @@ describe('looks', () => {
   it('copies only the changes, and they come back the same', () => {
     expect(lookChanges(DEFAULT_LOOKS)).toEqual({});
     const changed = structuredClone(DEFAULT_LOOKS);
-    changed.troll.bounce = 2.5;
+    changed.troll.speed = 2.5;
     changed.knight.colors!.armor = '#aa0000';
     changed.wizard.roof = 'yellow';
     const json = changesToJson(changed);
-    expect(JSON.parse(json)).toEqual({ troll: { bounce: 2.5 }, knight: { colors: { armor: '#aa0000' } }, wizard: { roof: 'yellow' } });
+    expect(JSON.parse(json)).toEqual({ troll: { speed: 2.5 }, knight: { colors: { armor: '#aa0000' } }, wizard: { roof: 'yellow' } });
     expect(mergeLooks(DEFAULT_LOOKS, JSON.parse(json))).toEqual(changed);
   });
 
@@ -654,6 +654,7 @@ describe('looks', () => {
       }
     }
     for (const roof of LOOK_CHOICES.roof.options) for (const f of [0, 1, 2, 3, 4]) expect(hasSprite(`catapult-${f}-${roof}`)).toBe(true);
+    for (const enemy of ['kobold', 'hexling', 'brute', 'troll']) for (const anim of ['walk', 'fight']) expect(hasSprite(`${enemy}-${anim}`), `${enemy}-${anim}`).toBe(true);
     for (const unit of ['knight', 'soldier']) for (const anim of ['idle', 'walk', 'fight', 'death']) {
       expect(hasSprite(`${unit}-${anim}`), `${unit}-${anim}`).toBe(true);
       expect(hasSprite(`${unit}-${anim}-mask`)).toBe(true);

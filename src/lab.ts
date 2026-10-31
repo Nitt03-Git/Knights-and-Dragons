@@ -3,7 +3,7 @@
 // JSON to paste in the chat (Claude then puts them in data/looks.json for everyone).
 import { BALANCE } from './data';
 import { CHOICE_KEYS, changesToJson, COLOR_NAMES, DEFAULT_LOOKS, LOOK_CHOICES, LOOK_NAMES, LOOK_SLIDERS, LOOKS, lookChanges, resetLooks, setLookChoice, setLookColor, setLookNumber, sliderLabel, type ChoiceKey, type SliderKey } from './looks';
-import { drawEnemy, drawHero, drawKnight, drawTower, FALLEN_FOR, preloadPictures } from './render';
+import { drawEnemy, drawHero, drawKnight, drawTower, ENEMY_FALLEN_FOR, FALLEN_FOR, preloadPictures } from './render';
 import type { Enemy, Hero, Knight } from './sim';
 
 export type Pose = 'walk' | 'fight' | 'hurt' | 'still' | 'fall';
@@ -30,10 +30,10 @@ export const SPOTS: Record<string, { x: number; y: number; h: number }> = {
   knight: { x: 120, y: 295, h: 60 },
   soldier: { x: 230, y: 295, h: 60 },
   hero: { x: 410, y: 295, h: 80 },
-  kobold: { x: 70, y: 415, h: 32 },
-  brute: { x: 185, y: 415, h: 42 },
-  troll: { x: 310, y: 415, h: 60 },
-  hexling: { x: 435, y: 415, h: 45 },
+  kobold: { x: 70, y: 415, h: 36 },
+  brute: { x: 185, y: 415, h: 50 },
+  troll: { x: 310, y: 415, h: 75 },
+  hexling: { x: 435, y: 415, h: 42 },
   wyrmling: { x: 560, y: 415, h: 80 },
 };
 const TOWERS = ['archer', 'knights', 'wizard', 'catapult'];
@@ -196,8 +196,10 @@ export class Lab {
     if (!spec) return;
     // Walking in place: the step pattern follows distance, as on the road.
     const d = 1000 + (pose === 'walk' || spec.flying ? time * spec.speed : 0);
-    const e = { type: id, spec, x, y, d, hp: pose === 'hurt' ? spec.hp * 0.6 : spec.hp, hitAge } as unknown as Enemy;
-    drawEnemy(ctx, e, 1e9);
+    const e = { id: x, type: id, spec, x, y, d, hp: pose === 'hurt' ? spec.hp * 0.6 : spec.hp, hitAge, heldBy: pose === 'fight' ? 1 : null } as unknown as Enemy;
+    // Fall: killed, lying a moment, then back (the loop starts over).
+    const fallen = pose === 'fall' ? time % (ENEMY_FALLEN_FOR + 0.6) : -1;
+    drawEnemy(ctx, e, 1e9, time, -1, fallen);
   }
 
   // ---- Panel ----
@@ -211,7 +213,7 @@ export class Lab {
     // Units with changes get a pencil in the list.
     const options = Object.keys(LOOKS).map((k) => `<option value="${k}" ${k === id ? 'selected' : ''}>${LOOK_NAMES[k] ?? k}${edited[k] ? ' ✏️' : ''}</option>`).join('');
     const poses: [Pose, string][] = [['walk', isTower ? 'Idle' : 'Walk'], ['fight', isTower ? 'Shoot' : 'Fight'], ['hurt', 'Hurt'], ['still', 'Still'], ['fall', 'Fall']];
-    const canFall = id === 'knight' || id === 'soldier';
+    const canFall = ['knight', 'soldier', 'kobold', 'brute', 'troll', 'hexling'].includes(id);
     const poseRow = (isTower ? poses.filter(([p]) => p !== 'walk' && p !== 'hurt' && p !== 'fall') : poses.filter(([p]) => p !== 'fall' || canFall))
       .map(([p, label]) => `<button class="pill small${this.pose === p || (isTower && this.pose !== 'fight' && p === 'still') ? ' on' : ''}" data-pose="${p}">${label}</button>`).join('');
     const levelRow = isTower

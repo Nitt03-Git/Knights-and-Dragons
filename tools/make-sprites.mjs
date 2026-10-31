@@ -46,7 +46,8 @@ for (const r of CHARACTERS) {
   writeFileSync(`public/sprites/${r.name}.png`, Buffer.from(s.sheet.split(',')[1], 'base64'));
   if (s.mask) writeFileSync(`public/sprites/${r.name}-mask.png`, Buffer.from(s.mask.split(',')[1], 'base64'));
   const round = (n) => Math.round((n / PX_PER_WORLD) * 10) / 10;
-  manifest[r.name] = { w: round(s.w), h: round(s.h), ax: round(s.ax), ay: round(s.ay), frames: s.frames, ...(s.mask ? { mask: true } : {}) };
+  const len = r.times.length > 1 ? Math.round((r.times[1] - r.times[0]) * r.times.length * 1000) / 1000 : 1;
+  manifest[r.name] = { w: round(s.w), h: round(s.h), ax: round(s.ax), ay: round(s.ay), frames: s.frames, len, ...(s.mask ? { mask: true } : {}) };
   console.log(r.name, `${s.frames} × ${s.w}×${s.h}px`);
 }
 if (!only.length) writeFileSync('src/sprites.json', JSON.stringify(manifest, null, 0).replace(/\},"/g, '},\n  "').replace(/^\{/, '{\n  ').replace(/\}$/, '\n}') + '\n');

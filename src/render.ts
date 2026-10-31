@@ -1,7 +1,7 @@
 // Draws the game with simple shapes. Phase 2 replaces these draw functions with real art;
 // nothing in here changes the game.
 import { colorsOf, lookOf, rgb, shade, type Look } from './looks';
-import { drawFrame, drawSprite, frameCount, preload, sprite } from './sprites';
+import { animLength, drawFrame, drawSprite, frameCount, preload, sprite } from './sprites';
 import { makeRng } from './rng';
 import { FLY_HEIGHT, WORLD_H, WORLD_W, type Enemy, type Game, type Hero, type Knight, type Projectile, type Strike, type Tower } from './sim';
 
@@ -118,6 +118,11 @@ export class Renderer {
   /** Which way each knight faces (1 right, -1 left), and where it was last frame. */
   private faces = new Map<number, number>();
   private lastX = new Map<number, number>();
+  /** Enemies seen last frame, which way each faces, and the ones just killed (still falling). */
+  private seen = new Map<number, Enemy>();
+  private enemyFaces = new Map<number, number>();
+  private enemyX = new Map<number, number>();
+  private fallen: { e: Enemy; age: number; face: number }[] = [];
 
   constructor(private ctx: CanvasRenderingContext2D, game: Game) {
     this.scenery = makeScenery(game);
@@ -214,7 +219,12 @@ export class Renderer {
       });
     }
     // Flyers are drawn after everything that stands on the ground.
-    for (const e of game.enemies) if (!e.spec.flying) items.push({ y: e.y, draw: () => drawEnemy(ctx, e, game.paths[e.path].length) });
+    this.trackEnemies(game, dt);
+    for (const e of game.enemies) {
+      const face = this.enemyFaces.get(e.id) ?? -1;
+      if (!e.spec.flying) items.push({ y: e.y, draw: () => drawEnemy(ctx, e, game.paths[e.path].length, game.time, face) });
+    }
+    for (const f of this.fallen) if (!f.e.spec.flying) items.push({ y: f.e.y, draw: () => drawEnemy(ctx, f.e, 1e9, game.time, f.face, f.age) });
     game.towers.forEach((t) => {
       const unit = t && game.towerLevel(t.type, t.level)?.unit;
       if (t && unit) {
@@ -245,12 +255,31 @@ export class Renderer {
     items.sort((a, b) => a.y - b.y);
     for (const it of items) it.draw();
 
-    for (const e of game.enemies) if (e.spec.flying) drawEnemy(ctx, e, game.paths[e.path].length);
+    for (const e of game.enemies) if (e.spec.flying) drawEnemy(ctx, e, game.paths[e.path].length, game.time, this.enemyFaces.get(e.id) ?? -1);
     for (const p of game.projectiles) drawProjectile(ctx, p);
     this.drawBooms(game, dt);
 
 
     this.drawFloaters(game, dt);
+  }
+
+  /** Enemies face the way they walk; the ones killed since last frame start falling. */
+  private trackEnemies(game: Game, dt: number): void {
+    const now = new Map(game.enemies.map((e) => [e.id, e]));
+    for (const [id, e] of this.seen) {
+      if (now.has(id)) continue;
+      if (e.hp <= 0) this.fallen.push({ e, age: 0, face: this.enemyFaces.get(id) ?? -1 });
+      this.enemyFaces.delete(id);
+      this.enemyX.delete(id);
+    }
+    this.seen = now;
+    for (const f of this.fallen) f.age += dt;
+    this.fallen = this.fallen.filter((f) => f.age < ENEMY_FALLEN_FOR);
+    for (const e of game.enemies) {
+      const lx = this.enemyX.get(e.id);
+      if (lx !== undefined && Math.abs(e.x - lx) > 0.05) this.enemyFaces.set(e.id, e.x > lx ? 1 : -1);
+      this.enemyX.set(e.id, e.x);
+    }
   }
 
   /** Knights face the enemy they fight, otherwise the way they last walked. */
@@ -629,6 +658,7 @@ export function towerSprite(t: TowerLook, cooldown: number): string {
 export function preloadPictures(): void {
   const names = ['tree-large', 'tree-small'];
   for (const unit of ['knight', 'soldier']) for (const anim of Object.keys(KNIGHT_ANIMS)) names.push(`${unit}-${anim}`, `${unit}-${anim}-mask`);
+  for (const enemy of Object.keys(ENEMY_HEIGHT)) for (const anim of ['walk', 'fight', 'death']) names.push(`${enemy}-${anim}`, `${enemy}-${anim}-mask`);
   for (const type of ['archer', 'knights', 'wizard']) for (const level of [0, 1, 2]) names.push(towerSprite({ type, level, shotAge: 9 }, 1));
   for (let f = 0; f <= 4; f++) names.push(`catapult-${f}-${lookOf('catapult').roof}`);
   preload(names);
@@ -1095,7 +1125,69 @@ function rallyPlus(ctx: CanvasRenderingContext2D, x: number, y: number): void {
   ctx.stroke();
 }
 
-export function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, roadLength: number): void {
+/** How tall each enemy's picture is (game units, at size 1): its health bar goes above. */
+const ENEMY_HEIGHT: Record<string, number> = { kobold: 30, hexling: 36, brute: 46, troll: 68 };
+/** How long a fallen enemy stays before it is gone. */
+export const ENEMY_FALLEN_FOR = 3;
+
+/**
+ * An enemy: the monster pictures once loaded, drawn shapes until then (and for those without
+ * pictures yet). `facing` 1 is right; `deadFor` is seconds since it was killed (-1: alive).
+ */
+export function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, roadLength: number, time = 0, facing = -1, deadFor = -1): void {
+  if (sprite(`${e.type}-walk`)) return drawEnemyPicture(ctx, e, roadLength, time, facing, deadFor);
+  if (deadFor >= 0) return;
+  drawEnemyShape(ctx, e, roadLength);
+}
+
+function drawEnemyPicture(ctx: CanvasRenderingContext2D, e: Enemy, roadLength: number, time: number, facing: number, deadFor: number): void {
+  const look = lookOf(e.type);
+  const size = look.size;
+  const speed = look.speed ?? 1;
+  const dying = deadFor >= 0;
+  let name = `${e.type}-${dying ? 'death' : e.heldBy !== null ? 'fight' : 'walk'}`;
+  let alpha = dying ? 1 : Math.max(0, Math.min(1, e.d / 60, (roadLength - e.d) / 60));
+  let sink = 0;
+  let frame: number;
+  if (dying && !sprite(name)) {
+    // No fall in the file (the troll): it sinks into the ground and fades.
+    name = `${e.type}-walk`;
+    frame = 0;
+    sink = Math.min(1, deadFor / 0.9) * 14 * size;
+    alpha = Math.max(0, 1 - deadFor / 0.9);
+  } else {
+    const n = frameCount(name);
+    const len = animLength(name);
+    if (dying) {
+      frame = Math.min(n - 1, (deadFor / len) * n);
+      alpha = Math.max(0, Math.min(1, (ENEMY_FALLEN_FOR - deadFor) / 0.6));
+    } else if (e.heldBy !== null) frame = ((time * speed + e.id * 0.37) / len) * n;
+    // Steps follow the distance walked, so feet don't slide whatever the speed.
+    else frame = (e.d / (e.spec.speed * len)) * n * speed;
+  }
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  shadow(ctx, e.x, e.y, (e.spec.size * 0.75) * size);
+  if (sink) {
+    ctx.beginPath();
+    ctx.rect(e.x - 200, e.y - 400, 400, 400 + 4);
+    ctx.clip();
+  }
+  drawFrame(ctx, name, frame, e.x, e.y + sink, { faceRight: facing > 0, size, tint: colorsOf(e.type).body, flash: !dying && e.hitAge < 0.08 });
+  ctx.restore();
+  if (dying || e.hp >= e.spec.hp) return;
+  const w = Math.max(28, e.spec.size * 2.4);
+  const f = Math.max(0, e.hp / e.spec.hp);
+  const by = e.y - (ENEMY_HEIGHT[e.type] ?? 40) * size - 10;
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = C.hpBack;
+  ctx.fillRect(e.x - w / 2 - 1, by - 1, w + 2, 7);
+  ctx.fillStyle = f > 0.35 ? C.hp : C.hpLow;
+  ctx.fillRect(e.x - w / 2, by, w * f, 5);
+  ctx.globalAlpha = 1;
+}
+
+function drawEnemyShape(ctx: CanvasRenderingContext2D, e: Enemy, roadLength: number): void {
   // Fade in and out at the ends of the road instead of popping.
   ctx.globalAlpha = Math.max(0, Math.min(1, e.d / 60, (roadLength - e.d) / 60));
   const look = lookOf(e.type);
@@ -1107,7 +1199,7 @@ export function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, roadLength: n
   shadow(ctx, e.x, e.y, flying ? r * 0.7 : r);
   const cy = e.y - r - bob - (flying ? FLY_HEIGHT : 0);
   const body = colorsOf(e.type).body;
-  const belly = colorsOf(e.type).belly;
+  const belly = colorsOf(e.type).belly ?? shade(body, 0.35);
   if (flying) {
     // Flapping wings behind the body
     const flap = Math.sin(step / 6) * 0.6 * (look.swing ?? 1);

@@ -198,6 +198,8 @@ export interface CharacterRecipe {
   colors?: Record<string, string>;
   /** A material to also render alone in white (the game tints it: the team colour). */
   mask?: string;
+  /** See-through materials (e.g. a glass helmet): how solid, 0 to 1. */
+  opacity?: Record<string, number>;
 }
 
 const fbx = new Map<string, THREE.Group>();
@@ -235,16 +237,25 @@ async function renderCharacter(r: CharacterRecipe): Promise<Sprite[]> {
     prop.updateMatrixWorld(true);
     bone.attach(prop);
   }
-  if (r.colors) {
+  if (r.colors || r.opacity) {
     root.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       const out = mats.map((m) => {
-        const c = r.colors![m.name];
-        if (!c) return m;
+        const c = r.colors?.[m.name];
+        const a = r.opacity?.[m.name];
+        if (!c && a === undefined) return m;
         const n = (m as THREE.MeshPhongMaterial).clone();
-        n.color = new THREE.Color(c);
+        if (c) {
+          n.color = new THREE.Color(c);
+          n.map = null;
+        }
+        if (a !== undefined) {
+          n.transparent = true;
+          n.opacity = a;
+          n.depthWrite = false;
+        }
         return n;
       });
       mesh.material = Array.isArray(mesh.material) ? out : out[0];
@@ -318,7 +329,9 @@ async function renderCharacter(r: CharacterRecipe): Promise<Sprite[]> {
     root.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
-      const swap = (m: THREE.Material) => (m.name === r.mask ? white : hide);
+      // See-through parts hide nothing behind them in the mask either.
+      const clear = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+      const swap = (m: THREE.Material) => (m.name === r.mask ? white : r.opacity?.[m.name] !== undefined ? clear : hide);
       mesh.material = Array.isArray(mesh.material) ? mesh.material.map(swap) : swap(mesh.material);
     });
     shoot();

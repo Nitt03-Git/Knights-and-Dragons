@@ -12,7 +12,7 @@ import { Lab } from './lab';
 import { Studio } from './studio';
 import type { HeroAbility, Level, SpecialKind } from './types';
 
-const VERSION = '0.11';
+const VERSION = '0.12';
 
 /** Towers in the build ring, clockwise from top-left. */
 const BUILD_RING: { type: string; icon: string; label: string; angle: number; soon?: string }[] = [

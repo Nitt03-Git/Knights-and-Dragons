@@ -176,7 +176,14 @@ Each one is a version the owner can play from the link.
   "Armor"). Knights have the visored helmet and long sword, Reinforcements another helmet and
   the short sword. They face the enemy they fight, flash white when hit, and fallen knights
   lie on the road a moment. Look Lab: Fall pose. Roch is still drawn (the pack has no horse).
-- **Next**: enemies (the owner is looking for a pack) and Roch.
+- **0.12 ✅**: **Quaternius enemies** (owner uploaded; CC0, in `art/monster-pack`): Kobold
+  Runner = alien (runs), Hexling = alien in a glass helmet (rendered see-through), Scaled Brute
+  = robot (falls apart when it dies), Bridge Troll = zombie, big and slow (no death in the file:
+  it sinks and fades; its own colour image wasn't in the upload, so the game colours it). They
+  punch or bite while a knight holds them, flash when hit, fall and fade when killed; bodies
+  tinted by the Look Lab Body colour. Wyrmling is still drawn. Names and the game's title don't
+  fit aliens and robots any more: to decide with the owner later.
+- **Next**: a flying enemy and Roch (owner is looking for packs).
 - **Later**: branching upgrades, sound, more levels, Phase 3.
 
 ## From the Gemini prototype

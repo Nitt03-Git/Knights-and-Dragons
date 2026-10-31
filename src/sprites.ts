@@ -14,7 +14,7 @@ export interface Sprite {
   mask?: boolean;
 }
 
-const SIZES = manifest as Record<string, { w: number; h: number; ax: number; ay: number; frames?: number; mask?: boolean }>;
+const SIZES = manifest as Record<string, { w: number; h: number; ax: number; ay: number; frames?: number; len?: number; mask?: boolean }>;
 const cache = new Map<string, Sprite | null>();
 
 export function hasSprite(name: string): boolean {
@@ -95,6 +95,11 @@ function strip(name: string, tint: string | null, white = false): CanvasImageSou
 
 export function frameCount(name: string): number {
   return SIZES[name]?.frames ?? 1;
+}
+
+/** How long an animation strip lasts, in seconds. */
+export function animLength(name: string): number {
+  return SIZES[name]?.len ?? 1;
 }
 
 /**

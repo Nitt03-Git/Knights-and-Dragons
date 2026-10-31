@@ -32,7 +32,8 @@ Full plan, decisions and milestones: `PLAN.md` (keep it up to date when the owne
 - Looks from the Look Lab arrive as pasted JSON with only the changes: merge them into
   `data/looks.json` (keep one line per unit), run `npm run check`, and screenshot the units.
 - Art (Phase 2): towers and trees come from Kenney's Castle Kit in `art/castle-kit`, knights
-  from Quaternius' Knight Pack in `art/knight-pack` (both CC0). Change which pieces and
+  from Quaternius' Knight Pack in `art/knight-pack`, enemies from Quaternius models in
+  `art/monster-pack` (all CC0). Change which pieces and
   animations make which picture in `tools/sprites/recipes.ts`, then `npm run sprites` and
   commit `public/sprites` and `src/sprites.json`. Any new art needs a licence that allows
   use in a game; keep its licence file next to it and credit it in README's Art section.
